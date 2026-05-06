@@ -8,11 +8,13 @@ Goal:
 
 Status: in progress.
 
+Phase 0 must also lock the MVP definition and explicit non-goals. See [MVP Definition and Non-Goals](mvp.md).
+
 ## Phase 1 — CLI Content Run MVP
 
 Goal:
 
-Create content runs from topic/brief and store them in file-based history.
+Create content runs from topic/brief and store metadata in SQLite while keeping generated artifacts in run folders.
 
 Commands:
 
@@ -26,7 +28,8 @@ Deliverables:
 - Go CLI scaffold.
 - Content run folder generation.
 - Brief JSON schema.
-- Revision history file.
+- SQLite-backed revision history.
+- Deterministic run artifact folder.
 
 ## Phase 2 — Carousel Renderer MVP
 

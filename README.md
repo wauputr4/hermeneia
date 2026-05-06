@@ -29,13 +29,15 @@ The first goal is simple: produce usable outputs quickly.
 
 - Carousel posts from structured content briefs.
 - Short videos from the same brief using Remotion templates.
-- File-based history for revisions.
+- SQLite-backed metadata and revision history.
 - CLI-first workflow so AI agents can operate it.
 - Web UI later for human-friendly content operations.
 
 ## MVP Goal
 
-The MVP should generate real content assets from a topic or brief:
+The MVP scope is documented in [docs/mvp.md](docs/mvp.md).
+
+The first MVP should generate real content assets from a topic or brief:
 
 ```text
 Input: topic or research brief
