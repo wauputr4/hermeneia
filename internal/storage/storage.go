@@ -4,13 +4,16 @@ import (
     "context"
     "database/sql"
     "errors"
+    "fmt"
     "os"
+    "path/filepath"
     "time"
 
     _ "modernc.org/sqlite"
 )
 
 const DefaultDatabasePath = "data/hermeneia.db"
+const schemaVersion = 1
 
 func DatabasePathFromEnv() string {
     if path := os.Getenv("HERMENEIA_DATABASE_PATH"); path != "" { return path }
@@ -19,15 +22,43 @@ func DatabasePathFromEnv() string {
 
 func Open(path string) (*sql.DB, error) {
     if path == "" { return nil, errors.New("database path is required") }
+    if err := ensureDatabaseDir(path); err != nil { return nil, err }
     db, err := sql.Open("sqlite", path)
     if err != nil { return nil, err }
     if _, err := db.Exec("PRAGMA foreign_keys = ON"); err != nil { db.Close(); return nil, err }
     return db, nil
 }
 
+func ensureDatabaseDir(path string) error {
+    if path == ":memory:" { return nil }
+    dir := filepath.Dir(path)
+    if dir == "." || dir == "" { return nil }
+    return os.MkdirAll(dir, 0o755)
+}
+
 func Migrate(ctx context.Context, db *sql.DB) error {
-    _, err := db.ExecContext(ctx, schemaSQL)
-    return err
+    tx, err := db.BeginTx(ctx, nil)
+    if err != nil { return err }
+    defer tx.Rollback()
+
+    if _, err := tx.ExecContext(ctx, schemaMigrationSQL); err != nil { return err }
+
+    currentVersion, err := currentSchemaVersion(ctx, tx)
+    if err != nil { return err }
+    if currentVersion > schemaVersion { return fmt.Errorf("database schema version %d is newer than supported version %d", currentVersion, schemaVersion) }
+    if currentVersion < 1 {
+        if _, err := tx.ExecContext(ctx, schemaV1SQL); err != nil { return err }
+        if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations(version) VALUES (?)`, schemaVersion); err != nil { return err }
+    }
+    return tx.Commit()
+}
+
+func currentSchemaVersion(ctx context.Context, tx *sql.Tx) (int, error) {
+    var version sql.NullInt64
+    err := tx.QueryRowContext(ctx, `SELECT MAX(version) FROM schema_migrations`).Scan(&version)
+    if err != nil { return 0, err }
+    if !version.Valid { return 0, nil }
+    return int(version.Int64), nil
 }
 
 type ContentRun struct { ID, Topic, ContentType, TemplateID string; CreatedAt time.Time }
@@ -59,12 +90,12 @@ func (r *Repository) GetContentRun(ctx context.Context, id string) (ContentRun, 
     return cr, err
 }
 func (r *Repository) CreateBriefVersion(ctx context.Context, bv BriefVersion) error {
-    _, err := r.db.ExecContext(ctx, `INSERT INTO brief_versions (id, run_id, version, body_json) VALUES (?, ?, ?, json(?))`, bv.ID, bv.RunID, bv.Version, bv.BodyJSON)
+    _, err := r.db.ExecContext(ctx, `INSERT INTO brief_versions (id, run_id, version, body_json) VALUES (?, ?, ?, ?)`, bv.ID, bv.RunID, bv.Version, bv.BodyJSON)
     return err
 }
 func (r *Repository) GetBriefVersion(ctx context.Context, id string) (BriefVersion, error) {
     var bv BriefVersion
-    err := r.db.QueryRowContext(ctx, `SELECT id, run_id, version, json(body_json), created_at FROM brief_versions WHERE id = ?`, id).Scan(&bv.ID, &bv.RunID, &bv.Version, &bv.BodyJSON, &bv.CreatedAt)
+    err := r.db.QueryRowContext(ctx, `SELECT id, run_id, version, body_json, created_at FROM brief_versions WHERE id = ?`, id).Scan(&bv.ID, &bv.RunID, &bv.Version, &bv.BodyJSON, &bv.CreatedAt)
     return bv, err
 }
 func (r *Repository) CreateArtifact(ctx context.Context, a Artifact) error {
@@ -83,13 +114,15 @@ func (r *Repository) CreateRevisionEvent(ctx context.Context, e RevisionEvent) e
 }
 func nullIfEmpty(s string) any { if s == "" { return nil }; return s }
 
-const schemaSQL = `
+const schemaMigrationSQL = `
 CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP);
+`
+
+const schemaV1SQL = `
 CREATE TABLE IF NOT EXISTS templates (id TEXT PRIMARY KEY, name TEXT NOT NULL, content_type TEXT NOT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS content_runs (id TEXT PRIMARY KEY, topic TEXT NOT NULL, content_type TEXT NOT NULL, template_id TEXT REFERENCES templates(id), created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS brief_versions (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES content_runs(id) ON DELETE CASCADE, version INTEGER NOT NULL, body_json TEXT NOT NULL CHECK (json_valid(body_json)), created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(run_id, version));
 CREATE TABLE IF NOT EXISTS render_jobs (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES content_runs(id) ON DELETE CASCADE, status TEXT NOT NULL, renderer TEXT NOT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, completed_at DATETIME);
 CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES content_runs(id) ON DELETE CASCADE, brief_version_id TEXT REFERENCES brief_versions(id), kind TEXT NOT NULL, path TEXT NOT NULL, checksum TEXT, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS revision_events (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES content_runs(id) ON DELETE CASCADE, from_brief_version_id TEXT NOT NULL REFERENCES brief_versions(id), to_brief_version_id TEXT NOT NULL REFERENCES brief_versions(id), instruction TEXT NOT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP);
-INSERT OR IGNORE INTO schema_migrations(version) VALUES (1);
 `

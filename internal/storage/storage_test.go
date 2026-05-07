@@ -3,6 +3,8 @@ package storage
 import (
     "context"
     "database/sql"
+    "os"
+    "path/filepath"
     "testing"
 )
 
@@ -29,4 +31,24 @@ func TestMigrateAndRepositoryCreateRead(t *testing.T) {
 func TestDatabasePathFromEnv(t *testing.T) {
     t.Setenv("HERMENEIA_DATABASE_PATH", "/tmp/hermeneia-test.db")
     if got := DatabasePathFromEnv(); got != "/tmp/hermeneia-test.db" { t.Fatalf("unexpected path %q", got) }
+}
+
+func TestOpenCreatesDatabaseDirectory(t *testing.T) {
+    path := filepath.Join(t.TempDir(), "nested", "data", "hermeneia.db")
+    db, err := Open(path)
+    if err != nil { t.Fatal(err) }
+    defer db.Close()
+    if _, err := os.Stat(filepath.Dir(path)); err != nil { t.Fatalf("expected database directory to exist: %v", err) }
+}
+
+func TestMigrateRecordsSchemaVersion(t *testing.T) {
+    ctx := context.Background()
+    db, err := Open(":memory:")
+    if err != nil { t.Fatal(err) }
+    defer db.Close()
+    if err := Migrate(ctx, db); err != nil { t.Fatal(err) }
+    if err := Migrate(ctx, db); err != nil { t.Fatalf("second migration should be idempotent: %v", err) }
+    var version int
+    if err := db.QueryRowContext(ctx, `SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil { t.Fatal(err) }
+    if version != schemaVersion { t.Fatalf("unexpected schema version %d", version) }
 }

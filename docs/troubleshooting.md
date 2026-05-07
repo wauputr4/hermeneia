@@ -45,3 +45,11 @@ For tests or temporary local runs, use an isolated path:
 ```bash
 HERMENEIA_DATABASE_PATH=/tmp/hermeneia.db go run ./cmd/hermeneia init
 ```
+
+## 2026-05-07 — SQLite migration review follow-up
+
+PR review feedback on the initial storage layer clarified three reliability rules:
+
+- `storage.Open` should create parent directories for file-backed SQLite database paths before opening the database; `:memory:` remains unchanged for tests.
+- Schema migrations should run inside a transaction and record an applied schema version in `schema_migrations` so future migrations have a clear upgrade path.
+- Repository queries should avoid redundant SQLite `json(...)` calls when the schema already validates JSON with `CHECK (json_valid(body_json))`.
