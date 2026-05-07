@@ -35,3 +35,13 @@ Important direction:
 - SQLite is the queryable source of truth for run metadata, brief versions, revision events, template selections, and artifact references.
 - The `runs/` directory remains the source of truth for exported asset bytes and inspectable JSON/Markdown snapshots.
 - If a database row and file artifact disagree, prefer preserving the file artifact and repair/rebuild the SQLite metadata from the run folder where possible.
+
+## SQLite initialization
+
+If `hermeneia init` cannot open the database, check `HERMENEIA_DATABASE_PATH` first. The default path is `data/hermeneia.db`; parent directories must exist before initialization.
+
+For tests or temporary local runs, use an isolated path:
+
+```bash
+HERMENEIA_DATABASE_PATH=/tmp/hermeneia.db go run ./cmd/hermeneia init
+```
