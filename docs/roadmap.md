@@ -21,6 +21,7 @@ Commands:
 ```bash
 hermeneia create --topic "latest AI news" --type carousel
 hermeneia revise --run runs/example --instruction "Make it sharper"
+hermeneia render --run runs/example
 ```
 
 Deliverables:
@@ -30,6 +31,7 @@ Deliverables:
 - Brief JSON schema.
 - SQLite-backed revision history.
 - Deterministic run artifact folder.
+- Render command that records exported artifact metadata.
 
 ## Phase 2 — Carousel Renderer MVP
 

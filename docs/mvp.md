@@ -49,13 +49,14 @@ hermeneia create
 hermeneia list
 hermeneia show
 hermeneia revise
+hermeneia render
 ```
 
-Render commands can arrive after the storage and brief workflow are stable.
+`hermeneia render` may initially support only deterministic local renderers, but it belongs in the MVP command surface because exportable assets are part of the mission.
 
 ### 2. SQLite Storage
 
-SQLite is the MVP source of truth for metadata.
+SQLite is the MVP source of truth for run metadata, version history, template selections, and artifact references. The file system remains the source of truth for the exported asset bytes and human-inspectable JSON/Markdown snapshots under `runs/`.
 
 It must store:
 
@@ -66,7 +67,7 @@ It must store:
 - revision events,
 - artifact references.
 
-Generated files can still live in `runs/`, but SQLite should track them.
+Generated files should live in `runs/`; SQLite should track their paths, types, checksums when available, and relationship to a run/version so metadata stays queryable without duplicating asset bytes.
 
 ### 3. Structured Brief Schema
 
@@ -131,6 +132,7 @@ hermeneia init
 hermeneia create --topic "AI agents in marketing" --type carousel --template carousel/ai-news-clean
 hermeneia show <run-id>
 hermeneia revise <run-id> --instruction "Make the hook sharper"
+hermeneia render <run-id>
 hermeneia list
 ```
 
@@ -139,7 +141,8 @@ And the project stores:
 - a SQLite record for the run,
 - at least two brief versions after revision,
 - a history entry,
-- a deterministic run artifact folder.
+- a deterministic run artifact folder,
+- a rendered artifact reference in SQLite after `hermeneia render`.
 
 ## Explicit Non-Goals for MVP
 

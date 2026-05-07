@@ -29,3 +29,9 @@ Important direction:
 - MVP prioritizes CLI + SQLite + structured brief/revision workflow.
 - Web UI, full AI research automation, and publishing integrations are intentionally deferred.
 - Generated artifacts may live in `runs/`, but SQLite should track metadata and revision history.
+
+## MVP storage/source-of-truth split
+
+- SQLite is the queryable source of truth for run metadata, brief versions, revision events, template selections, and artifact references.
+- The `runs/` directory remains the source of truth for exported asset bytes and inspectable JSON/Markdown snapshots.
+- If a database row and file artifact disagree, prefer preserving the file artifact and repair/rebuild the SQLite metadata from the run folder where possible.
