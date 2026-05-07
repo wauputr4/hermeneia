@@ -8,17 +8,20 @@ Goal:
 
 Status: in progress.
 
+Phase 0 must also lock the MVP definition and explicit non-goals. See [MVP Definition and Non-Goals](mvp.md).
+
 ## Phase 1 — CLI Content Run MVP
 
 Goal:
 
-Create content runs from topic/brief and store them in file-based history.
+Create content runs from topic/brief and store metadata in SQLite while keeping generated artifacts in run folders.
 
 Commands:
 
 ```bash
 hermeneia create --topic "latest AI news" --type carousel
 hermeneia revise --run runs/example --instruction "Make it sharper"
+hermeneia render --run runs/example
 ```
 
 Deliverables:
@@ -26,7 +29,9 @@ Deliverables:
 - Go CLI scaffold.
 - Content run folder generation.
 - Brief JSON schema.
-- Revision history file.
+- SQLite-backed revision history.
+- Deterministic run artifact folder.
+- Render command that records exported artifact metadata.
 
 ## Phase 2 — Carousel Renderer MVP
 

@@ -71,4 +71,4 @@ runs/{run-id}/
 └─ output/
 ```
 
-Later, move to SQLite or PostgreSQL when the UI needs filtering, collaboration, scheduling, and audit logs.
+Later, keep SQLite for local/single-user installs or move to PostgreSQL when the UI needs hosted collaboration, scheduling, and audit logs.
