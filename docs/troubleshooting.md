@@ -50,6 +50,10 @@ HERMENEIA_DATABASE_PATH=/tmp/hermeneia.db go run ./cmd/hermeneia init
 
 The CLI entrypoint should call the shared `run` helper so production execution and tests use the same command initialization path. Unit tests that instantiate `command` directly should provide a `stdout` writer, even when the exercised path is expected to return an error, so future command output cannot panic on a nil writer.
 
+## Brief schema examples
+
+When changing the MVP brief schema, update the Go struct in `internal/brief`, the schema documentation, and the committed example JSON together. Tests load the example file directly, so schema drift should be caught by `go test ./...`.
+
 ## 2026-05-07 — SQLite migration review follow-up
 
 PR review feedback on the initial storage layer clarified three reliability rules:
