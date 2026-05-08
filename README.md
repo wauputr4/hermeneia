@@ -79,6 +79,33 @@ TypeScript remains important because Remotion and web UI workflows are naturally
 
 This repository is currently in planning/scaffolding mode.
 
+## Local Development
+
+Hermeneia is currently CLI-first. The Go entrypoint lives at `cmd/hermeneia`.
+
+Prerequisites:
+
+- Go toolchain compatible with the version in `go.mod`.
+
+Common commands:
+
+```bash
+go test ./...
+go run ./cmd/hermeneia help
+go run ./cmd/hermeneia init
+```
+
+By default, `hermeneia init` creates or migrates `data/hermeneia.db`. To use an isolated database path:
+
+```bash
+HERMENEIA_DATABASE_PATH=/tmp/hermeneia.db go run ./cmd/hermeneia init
+```
+
+Current CLI surface:
+
+- `hermeneia init` initializes SQLite storage.
+- `hermeneia create`, `list`, `show`, `revise`, and `render` are reserved in the help output and currently return clear planned-command errors until their workflow services are implemented.
+
 ## License
 
 Apache-2.0

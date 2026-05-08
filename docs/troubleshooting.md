@@ -53,3 +53,13 @@ PR review feedback on the initial storage layer clarified three reliability rule
 - `storage.Open` should create parent directories for file-backed SQLite database paths before opening the database; `:memory:` remains unchanged for tests.
 - Schema migrations should run inside a transaction and record an applied schema version in `schema_migrations` so future migrations have a clear upgrade path.
 - Repository queries should avoid redundant SQLite `json(...)` calls when the schema already validates JSON with `CHECK (json_valid(body_json))`.
+
+## 2026-05-08 — CLI skeleton
+
+The first CLI skeleton exposes the MVP command surface in help output while only `hermeneia init` performs real work.
+
+Notes:
+
+- `hermeneia init` uses `HERMENEIA_DATABASE_PATH` or defaults to `data/hermeneia.db`.
+- Planned commands (`create`, `list`, `show`, `revise`, `render`) intentionally return clear "not implemented yet" errors until the workflow services are implemented.
+- Unknown commands should point users back to `hermeneia help` instead of failing silently.
