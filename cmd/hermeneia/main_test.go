@@ -33,7 +33,7 @@ func TestHelpOutputIncludesMVPCommandSurface(t *testing.T) {
 }
 
 func TestUnknownCommandReturnsClearError(t *testing.T) {
-	cmd := command{}
+	cmd := command{stdout: &bytes.Buffer{}}
 
 	err := cmd.run(context.Background(), []string{"publish"})
 	if err == nil {
@@ -45,7 +45,7 @@ func TestUnknownCommandReturnsClearError(t *testing.T) {
 }
 
 func TestPlannedCommandsReturnClearErrors(t *testing.T) {
-	cmd := command{}
+	cmd := command{stdout: &bytes.Buffer{}}
 
 	for _, name := range []string{"create", "list", "show", "revise", "render"} {
 		err := cmd.run(context.Background(), []string{name})
@@ -74,7 +74,7 @@ func TestInitCreatesSQLiteDatabase(t *testing.T) {
 }
 
 func TestInitRejectsUnexpectedArguments(t *testing.T) {
-	cmd := command{}
+	cmd := command{stdout: &bytes.Buffer{}}
 
 	err := cmd.run(context.Background(), []string{"init", "--force"})
 	if err == nil {

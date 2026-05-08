@@ -11,11 +11,7 @@ import (
 )
 
 func main() {
-	cmd := command{
-		stdout: os.Stdout,
-		stderr: os.Stderr,
-	}
-	if err := cmd.run(context.Background(), os.Args[1:]); err != nil {
+	if err := run(context.Background(), os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "hermeneia:", err)
 		os.Exit(1)
 	}
@@ -24,14 +20,12 @@ func main() {
 func run(ctx context.Context, args []string) error {
 	cmd := command{
 		stdout: os.Stdout,
-		stderr: os.Stderr,
 	}
 	return cmd.run(ctx, args)
 }
 
 type command struct {
 	stdout io.Writer
-	stderr io.Writer
 }
 
 func (c command) run(ctx context.Context, args []string) error {

@@ -46,6 +46,10 @@ For tests or temporary local runs, use an isolated path:
 HERMENEIA_DATABASE_PATH=/tmp/hermeneia.db go run ./cmd/hermeneia init
 ```
 
+## CLI command tests
+
+The CLI entrypoint should call the shared `run` helper so production execution and tests use the same command initialization path. Unit tests that instantiate `command` directly should provide a `stdout` writer, even when the exercised path is expected to return an error, so future command output cannot panic on a nil writer.
+
 ## 2026-05-07 — SQLite migration review follow-up
 
 PR review feedback on the initial storage layer clarified three reliability rules:
