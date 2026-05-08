@@ -82,3 +82,24 @@ Initial options:
 Business workflow logic should live in the Go backend/core, not inside the UI or renderer.
 
 Renderers should be deterministic workers that receive structured input and output assets.
+
+## SQLite storage layer
+
+The MVP storage layer lives in Go under `internal/storage` and is intentionally renderer-agnostic. It owns database initialization, migrations, and repository functions for core workflow metadata:
+
+- `templates`
+- `content_runs`
+- `brief_versions`
+- `render_jobs`
+- `artifacts`
+- `revision_events`
+
+The CLI initializes this schema with `hermeneia init`. The database path is configured with `HERMENEIA_DATABASE_PATH`; when unset, Hermeneia uses `data/hermeneia.db`.
+
+SQLite stores queryable metadata and relationships. Exported files remain in `runs/{run-id}/`, with database artifact rows pointing to those paths instead of embedding asset bytes.
+
+## SQLite Migration Strategy
+
+The MVP storage layer uses an explicit `schema_migrations` table with integer versions. Migrations run transactionally: Hermeneia creates the migration table, checks the highest applied version, applies pending schema changes, records the version, and commits as one unit.
+
+File-backed SQLite databases should be opened through the storage package so parent directories are created consistently before initialization.
