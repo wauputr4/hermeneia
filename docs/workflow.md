@@ -41,6 +41,8 @@ A brief should contain:
 - platform,
 - content type.
 
+The canonical MVP JSON shape is documented in [Schemas](schemas.md), with an example at [examples/brief.ai-agents-carousel.json](../examples/brief.ai-agents-carousel.json).
+
 ## 3. Template Selection
 
 Users or agents select a template:
