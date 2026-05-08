@@ -1,6 +1,7 @@
 package brief
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -45,11 +46,15 @@ func TestExampleBriefMatchesSchema(t *testing.T) {
 	}
 
 	var got Brief
-	if err := json.Unmarshal(data, &got); err != nil {
-		t.Fatal(err)
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&got); err != nil {
+		t.Fatalf("example brief does not match schema: %v", err)
 	}
 
-	if got.Topic == "" || got.Hook == "" || len(got.KeyPoints) == 0 || len(got.Hashtags) == 0 {
+	if got.Topic == "" || got.Angle == "" || got.Hook == "" || got.TargetAudience == "" ||
+		got.Platform == "" || got.ContentType == "" || got.Tone == "" || len(got.KeyPoints) == 0 ||
+		got.VisualDirection == "" || got.CTA == "" || got.CaptionDraft == "" || len(got.Hashtags) == 0 {
 		t.Fatalf("example brief is incomplete: %#v", got)
 	}
 }
