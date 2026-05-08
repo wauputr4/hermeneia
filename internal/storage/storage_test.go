@@ -28,6 +28,15 @@ func TestMigrateAndRepositoryCreateRead(t *testing.T) {
 	if err := repo.CreateBriefVersion(ctx, BriefVersion{ID: "brief-1", RunID: "run-1", Version: 1, BodyJSON: `{"topic":"AI agents"}`}); err != nil {
 		t.Fatal(err)
 	}
+	if err := repo.CreateBriefVersion(ctx, BriefVersion{ID: "brief-2", RunID: "run-1", Version: 2, BodyJSON: `{"topic":"Sharper AI agents"}`}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.CreateRevisionEvent(ctx, RevisionEvent{ID: "revision-1", RunID: "run-1", FromBriefVersionID: "brief-1", ToBriefVersionID: "brief-2", Instruction: "Make the hook sharper"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.CreateRenderJob(ctx, RenderJob{ID: "render-1", RunID: "run-1", Status: "queued", Renderer: "carousel/html"}); err != nil {
+		t.Fatal(err)
+	}
 	if err := repo.CreateArtifact(ctx, Artifact{ID: "artifact-1", RunID: "run-1", BriefVersionID: "brief-1", Kind: "carousel_png", Path: "runs/run-1/output/slide-1.png"}); err != nil {
 		t.Fatal(err)
 	}
@@ -44,6 +53,20 @@ func TestMigrateAndRepositoryCreateRead(t *testing.T) {
 	}
 	if brief.Version != 1 || brief.BodyJSON == "" {
 		t.Fatalf("unexpected brief: %#v", brief)
+	}
+	revision, err := repo.GetRevisionEvent(ctx, "revision-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if revision.FromBriefVersionID != "brief-1" || revision.ToBriefVersionID != "brief-2" || revision.Instruction == "" {
+		t.Fatalf("unexpected revision event: %#v", revision)
+	}
+	renderJob, err := repo.GetRenderJob(ctx, "render-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if renderJob.Status != "queued" || renderJob.Renderer != "carousel/html" || renderJob.CompletedAt != nil {
+		t.Fatalf("unexpected render job: %#v", renderJob)
 	}
 	artifact, err := repo.GetArtifact(ctx, "artifact-1")
 	if err != nil {

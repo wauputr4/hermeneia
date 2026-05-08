@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -44,20 +45,6 @@ func TestUnknownCommandReturnsClearError(t *testing.T) {
 	}
 }
 
-func TestPlannedCommandsReturnClearErrors(t *testing.T) {
-	cmd := command{stdout: &bytes.Buffer{}}
-
-	for _, name := range []string{"create", "list", "show", "revise", "render"} {
-		err := cmd.run(context.Background(), []string{name})
-		if err == nil {
-			t.Fatalf("expected error for %s", name)
-		}
-		if got := err.Error(); !strings.Contains(got, "not implemented yet") {
-			t.Fatalf("unexpected %s error: %q", name, got)
-		}
-	}
-}
-
 func TestInitCreatesSQLiteDatabase(t *testing.T) {
 	var stdout bytes.Buffer
 	path := filepath.Join(t.TempDir(), "nested", "hermeneia.db")
@@ -82,5 +69,67 @@ func TestInitRejectsUnexpectedArguments(t *testing.T) {
 	}
 	if got := err.Error(); !strings.Contains(got, "does not accept arguments") {
 		t.Fatalf("unexpected error: %q", got)
+	}
+}
+
+func TestCLIContentRunWorkflow(t *testing.T) {
+	ctx := context.Background()
+	var stdout bytes.Buffer
+	dbPath := filepath.Join(t.TempDir(), "hermeneia.db")
+	runsRoot := filepath.Join(t.TempDir(), "runs")
+	t.Setenv("HERMENEIA_DATABASE_PATH", dbPath)
+
+	ids := 0
+	cmd := command{
+		stdout:   &stdout,
+		runsRoot: runsRoot,
+		newID: func(prefix, seed string) string {
+			if prefix == "run" {
+				return "run-cli"
+			}
+			ids++
+			return prefix + "-cli-" + string(rune('a'+ids))
+		},
+	}
+	if err := cmd.run(ctx, []string{"create", "--topic", "AI agents in marketing", "--type", "carousel"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "created run run-cli") {
+		t.Fatalf("unexpected create output:\n%s", stdout.String())
+	}
+	if _, err := os.Stat(filepath.Join(runsRoot, "run-cli", "brief.v1.json")); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout.Reset()
+	if err := cmd.run(ctx, []string{"revise", "run-cli", "--instruction", "Make the hook sharper"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "brief v2") {
+		t.Fatalf("unexpected revise output:\n%s", stdout.String())
+	}
+	if _, err := os.Stat(filepath.Join(runsRoot, "run-cli", "brief.v2.json")); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout.Reset()
+	if err := cmd.run(ctx, []string{"render", "run-cli"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "carousel_png") {
+		t.Fatalf("unexpected render output:\n%s", stdout.String())
+	}
+	if _, err := os.Stat(filepath.Join(runsRoot, "run-cli", "output", "carousel", "slide-01.png")); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout.Reset()
+	if err := cmd.run(ctx, []string{"show", "run-cli"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"run: run-cli", "brief_versions: 2", "artifacts:"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("show output missing %q:\n%s", want, stdout.String())
+		}
 	}
 }

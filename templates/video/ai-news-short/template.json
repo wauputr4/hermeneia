@@ -1,0 +1,10 @@
+{
+  "id": "video/ai-news-short",
+  "name": "AI News Short Video",
+  "content_type": "short_video",
+  "renderer": "remotion-contract-ffmpeg-mvp",
+  "aspect_ratio": "9:16",
+  "fps": 30,
+  "scene_contract": "runs/{run-id}/output/video/remotion-input.json",
+  "output": "runs/{run-id}/output/video/ai-news-short.mp4"
+}

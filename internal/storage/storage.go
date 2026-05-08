@@ -106,6 +106,11 @@ type Artifact struct {
 	ID, RunID, BriefVersionID, Kind, Path, Checksum string
 	CreatedAt                                       time.Time
 }
+type RenderJob struct {
+	ID, RunID, Status, Renderer string
+	CreatedAt                   time.Time
+	CompletedAt                 *time.Time
+}
 type RevisionEvent struct {
 	ID, RunID, FromBriefVersionID, ToBriefVersionID, Instruction string
 	CreatedAt                                                    time.Time
@@ -121,6 +126,10 @@ func NewRepository(db *sql.DB) *Repository { return &Repository{db: db} }
 
 func (r *Repository) CreateTemplate(ctx context.Context, t Template) error {
 	_, err := r.db.ExecContext(ctx, `INSERT INTO templates (id, name, content_type) VALUES (?, ?, ?)`, t.ID, t.Name, t.ContentType)
+	return err
+}
+func (r *Repository) EnsureTemplate(ctx context.Context, t Template) error {
+	_, err := r.db.ExecContext(ctx, `INSERT OR IGNORE INTO templates (id, name, content_type) VALUES (?, ?, ?)`, t.ID, t.Name, t.ContentType)
 	return err
 }
 func (r *Repository) GetTemplate(ctx context.Context, id string) (Template, error) {
@@ -141,6 +150,27 @@ func (r *Repository) GetContentRun(ctx context.Context, id string) (ContentRun, 
 	}
 	return cr, err
 }
+func (r *Repository) ListContentRuns(ctx context.Context) ([]ContentRun, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT id, topic, content_type, template_id, created_at FROM content_runs ORDER BY created_at DESC, id DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var runs []ContentRun
+	for rows.Next() {
+		var cr ContentRun
+		var template sql.NullString
+		if err := rows.Scan(&cr.ID, &cr.Topic, &cr.ContentType, &template, &cr.CreatedAt); err != nil {
+			return nil, err
+		}
+		if template.Valid {
+			cr.TemplateID = template.String
+		}
+		runs = append(runs, cr)
+	}
+	return runs, rows.Err()
+}
 func (r *Repository) CreateBriefVersion(ctx context.Context, bv BriefVersion) error {
 	_, err := r.db.ExecContext(ctx, `INSERT INTO brief_versions (id, run_id, version, body_json) VALUES (?, ?, ?, ?)`, bv.ID, bv.RunID, bv.Version, bv.BodyJSON)
 	return err
@@ -149,6 +179,28 @@ func (r *Repository) GetBriefVersion(ctx context.Context, id string) (BriefVersi
 	var bv BriefVersion
 	err := r.db.QueryRowContext(ctx, `SELECT id, run_id, version, body_json, created_at FROM brief_versions WHERE id = ?`, id).Scan(&bv.ID, &bv.RunID, &bv.Version, &bv.BodyJSON, &bv.CreatedAt)
 	return bv, err
+}
+func (r *Repository) GetLatestBriefVersion(ctx context.Context, runID string) (BriefVersion, error) {
+	var bv BriefVersion
+	err := r.db.QueryRowContext(ctx, `SELECT id, run_id, version, body_json, created_at FROM brief_versions WHERE run_id = ? ORDER BY version DESC LIMIT 1`, runID).Scan(&bv.ID, &bv.RunID, &bv.Version, &bv.BodyJSON, &bv.CreatedAt)
+	return bv, err
+}
+func (r *Repository) ListBriefVersions(ctx context.Context, runID string) ([]BriefVersion, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT id, run_id, version, body_json, created_at FROM brief_versions WHERE run_id = ? ORDER BY version ASC`, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var versions []BriefVersion
+	for rows.Next() {
+		var bv BriefVersion
+		if err := rows.Scan(&bv.ID, &bv.RunID, &bv.Version, &bv.BodyJSON, &bv.CreatedAt); err != nil {
+			return nil, err
+		}
+		versions = append(versions, bv)
+	}
+	return versions, rows.Err()
 }
 func (r *Repository) CreateArtifact(ctx context.Context, a Artifact) error {
 	_, err := r.db.ExecContext(ctx, `INSERT INTO artifacts (id, run_id, brief_version_id, kind, path, checksum) VALUES (?, ?, ?, ?, ?, ?)`, a.ID, a.RunID, nullIfEmpty(a.BriefVersionID), a.Kind, a.Path, nullIfEmpty(a.Checksum))
@@ -166,15 +218,80 @@ func (r *Repository) GetArtifact(ctx context.Context, id string) (Artifact, erro
 	}
 	return a, err
 }
+func (r *Repository) ListArtifactsByRun(ctx context.Context, runID string) ([]Artifact, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT id, run_id, brief_version_id, kind, path, checksum, created_at FROM artifacts WHERE run_id = ? ORDER BY created_at ASC, id ASC`, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var artifacts []Artifact
+	for rows.Next() {
+		var a Artifact
+		var bvid, checksum sql.NullString
+		if err := rows.Scan(&a.ID, &a.RunID, &bvid, &a.Kind, &a.Path, &checksum, &a.CreatedAt); err != nil {
+			return nil, err
+		}
+		if bvid.Valid {
+			a.BriefVersionID = bvid.String
+		}
+		if checksum.Valid {
+			a.Checksum = checksum.String
+		}
+		artifacts = append(artifacts, a)
+	}
+	return artifacts, rows.Err()
+}
+func (r *Repository) CreateRenderJob(ctx context.Context, job RenderJob) error {
+	_, err := r.db.ExecContext(ctx, `INSERT INTO render_jobs (id, run_id, status, renderer, completed_at) VALUES (?, ?, ?, ?, ?)`, job.ID, job.RunID, job.Status, job.Renderer, nullIfNilTime(job.CompletedAt))
+	return err
+}
+func (r *Repository) GetRenderJob(ctx context.Context, id string) (RenderJob, error) {
+	var job RenderJob
+	var completedAt sql.NullTime
+	err := r.db.QueryRowContext(ctx, `SELECT id, run_id, status, renderer, created_at, completed_at FROM render_jobs WHERE id = ?`, id).Scan(&job.ID, &job.RunID, &job.Status, &job.Renderer, &job.CreatedAt, &completedAt)
+	if completedAt.Valid {
+		job.CompletedAt = &completedAt.Time
+	}
+	return job, err
+}
 func (r *Repository) CreateRevisionEvent(ctx context.Context, e RevisionEvent) error {
 	_, err := r.db.ExecContext(ctx, `INSERT INTO revision_events (id, run_id, from_brief_version_id, to_brief_version_id, instruction) VALUES (?, ?, ?, ?, ?)`, e.ID, e.RunID, e.FromBriefVersionID, e.ToBriefVersionID, e.Instruction)
 	return err
+}
+func (r *Repository) GetRevisionEvent(ctx context.Context, id string) (RevisionEvent, error) {
+	var e RevisionEvent
+	err := r.db.QueryRowContext(ctx, `SELECT id, run_id, from_brief_version_id, to_brief_version_id, instruction, created_at FROM revision_events WHERE id = ?`, id).Scan(&e.ID, &e.RunID, &e.FromBriefVersionID, &e.ToBriefVersionID, &e.Instruction, &e.CreatedAt)
+	return e, err
+}
+func (r *Repository) ListRevisionEventsByRun(ctx context.Context, runID string) ([]RevisionEvent, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT id, run_id, from_brief_version_id, to_brief_version_id, instruction, created_at FROM revision_events WHERE run_id = ? ORDER BY created_at ASC, id ASC`, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var events []RevisionEvent
+	for rows.Next() {
+		var e RevisionEvent
+		if err := rows.Scan(&e.ID, &e.RunID, &e.FromBriefVersionID, &e.ToBriefVersionID, &e.Instruction, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		events = append(events, e)
+	}
+	return events, rows.Err()
 }
 func nullIfEmpty(s string) any {
 	if s == "" {
 		return nil
 	}
 	return s
+}
+func nullIfNilTime(t *time.Time) any {
+	if t == nil {
+		return nil
+	}
+	return *t
 }
 
 const schemaMigrationSQL = `
