@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import {
 	artifactGroups,
+	formatShortDate,
 	latestBrief,
 	runSummary,
 	templateForType
@@ -53,5 +54,9 @@ describe('web view model helpers', () => {
 	it('keeps template selection aligned to content type', () => {
 		assert.equal(templateForType('video'), 'video/ai-news-short');
 		assert.equal(templateForType('carousel'), 'carousel/ai-news-clean');
+	});
+
+	it('formats invalid dates without throwing', () => {
+		assert.equal(formatShortDate('not-a-date'), 'n/a');
 	});
 });

@@ -35,11 +35,17 @@ export function templateForType(contentType) {
 	return TEMPLATES.find((template) => template.type === contentType)?.id ?? TEMPLATES[0].id;
 }
 
+const shortDateFormatter = new Intl.DateTimeFormat('en', {
+	month: 'short',
+	day: '2-digit',
+	hour: '2-digit',
+	minute: '2-digit'
+});
+
 export function formatShortDate(value) {
-	return new Intl.DateTimeFormat('en', {
-		month: 'short',
-		day: '2-digit',
-		hour: '2-digit',
-		minute: '2-digit'
-	}).format(new Date(value));
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) {
+		return 'n/a';
+	}
+	return shortDateFormatter.format(date);
 }

@@ -19,31 +19,36 @@
 	} from '$lib/view-models.js';
 	import { onMount } from 'svelte';
 
-	let runs: ContentRun[] = [];
-	let selectedRunID = '';
-	let selectedDetails: RunDetails | null = null;
-	let selectedBrief: BriefVersion | null = null;
-	let loading = true;
-	let busy = false;
-	let error = '';
-	let notice = '';
-	let revisionInstruction = '';
-	let createForm = {
+	let runs = $state<ContentRun[]>([]);
+	let selectedRunID = $state('');
+	let selectedDetails = $state<RunDetails | null>(null);
+	let selectedBrief = $state<BriefVersion | null>(null);
+	let loading = $state(true);
+	let busy = $state(false);
+	let error = $state('');
+	let notice = $state('');
+	let revisionInstruction = $state('');
+	let createForm = $state({
 		topic: 'AI agents in marketing',
 		content_type: 'carousel',
 		template_id: 'carousel/ai-news-clean',
 		tone: 'clear and practical',
 		platform: 'instagram',
 		target_audience: 'content operators'
-	};
+	});
 
-	$: if (selectedDetails) {
-		selectedBrief = latestBrief(selectedDetails.briefs);
-	}
-	$: groupedArtifacts = selectedDetails ? [...artifactGroups(selectedDetails.artifacts).entries()] : [];
-	$: selectedTemplateOptions = TEMPLATES.filter((template) => template.type === createForm.content_type);
-	$: activeSummary =
-		selectedDetails && selectedDetails.run ? runSummary(selectedDetails.run, selectedDetails) : null;
+	$effect(() => {
+		selectedBrief = selectedDetails ? latestBrief(selectedDetails.briefs) : null;
+	});
+	const groupedArtifacts = $derived(
+		selectedDetails ? [...artifactGroups(selectedDetails.artifacts).entries()] : []
+	);
+	const selectedTemplateOptions = $derived(
+		TEMPLATES.filter((template) => template.type === createForm.content_type)
+	);
+	const activeSummary = $derived(
+		selectedDetails && selectedDetails.run ? runSummary(selectedDetails.run, selectedDetails) : null
+	);
 
 	onMount(loadRuns);
 
@@ -159,7 +164,7 @@
 		<aside class="sidebar" aria-label="Content runs">
 			<div class="panel-head">
 				<h2>Runs</h2>
-				<button type="button" class="ghost" on:click={loadRuns} disabled={busy || loading}>Refresh</button>
+				<button type="button" class="ghost" onclick={loadRuns} disabled={busy || loading}>Refresh</button>
 			</div>
 			{#if loading}
 				<p class="muted">Loading local API data...</p>
@@ -171,7 +176,7 @@
 						<button
 							type="button"
 							class:active={run.id === selectedRunID}
-							on:click={() => selectRun(run.id)}
+							onclick={() => selectRun(run.id)}
 						>
 							<strong>{run.topic}</strong>
 							<span>{run.content_type} / {formatShortDate(run.created_at)}</span>
@@ -231,14 +236,19 @@
 
 					<section class="actions">
 						<h3>Operations</h3>
-						<form on:submit|preventDefault={submitRevision}>
+						<form
+							onsubmit={(event) => {
+								event.preventDefault();
+								submitRevision();
+							}}
+						>
 							<label>
 								Revision instruction
 								<textarea bind:value={revisionInstruction} placeholder="Make the hook sharper"></textarea>
 							</label>
 							<button type="submit" disabled={busy || !revisionInstruction.trim()}>Save revision</button>
 						</form>
-						<button type="button" class="primary" on:click={submitRender} disabled={busy}>Render export</button>
+						<button type="button" class="primary" onclick={submitRender} disabled={busy}>Render export</button>
 					</section>
 				</div>
 
@@ -284,14 +294,19 @@
 
 		<aside class="creator" aria-label="Create run">
 			<h2>New Run</h2>
-			<form on:submit|preventDefault={submitCreateRun}>
+			<form
+				onsubmit={(event) => {
+					event.preventDefault();
+					submitCreateRun();
+				}}
+			>
 				<label>
 					Topic
 					<input bind:value={createForm.topic} required />
 				</label>
 				<label>
 					Content type
-					<select value={createForm.content_type} on:change={(event) => changeContentType(event.currentTarget.value)}>
+					<select value={createForm.content_type} onchange={(event) => changeContentType(event.currentTarget.value)}>
 						<option value="carousel">Carousel</option>
 						<option value="video">Short video</option>
 					</select>

@@ -74,12 +74,14 @@ function apiBase(): string {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+	const headers = new Headers(init?.headers);
+	if (!headers.has('content-type')) {
+		headers.set('content-type', 'application/json');
+	}
+
 	const response = await fetch(`${apiBase()}${path}`, {
 		...init,
-		headers: {
-			'content-type': 'application/json',
-			...(init?.headers ?? {})
-		}
+		headers
 	});
 	if (!response.ok) {
 		let message = `${response.status} ${response.statusText}`;
@@ -92,7 +94,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 		throw new Error(message);
 	}
 	if (response.status === 204) {
-		return undefined as T;
+		throw new Error('API returned no JSON content');
 	}
 	return (await response.json()) as T;
 }

@@ -112,6 +112,21 @@ Notes:
 - Hermeneia overwrites the returned plan's `sources`, `topic`, `content_type`, and `template_id` with local request values before writing `research.json`, so source URL traceability remains under local control.
 - If `--planner openai` fails because configuration is missing, either set the two environment variables or omit the flag to use the deterministic planner.
 
+## 2026-05-09 — Web UI Svelte 5 review notes
+
+The web UI is a Svelte 5 app. New components should use runes state (`$state`,
+`$derived`, `$effect`) and Svelte 5 event attributes (`onclick`, `onsubmit`,
+`onchange`) to avoid legacy-mode warnings during `npm run build`.
+
+The shared web API request helper should normalize custom headers through the
+`Headers` constructor before adding the default JSON content type. Typed JSON
+requests intentionally fail on HTTP 204 responses so list/detail callers do not
+silently receive `undefined`.
+
+Cache reusable `Intl.DateTimeFormat` instances in view-model helpers and return
+a fallback such as `n/a` for invalid timestamps so malformed API data cannot
+crash the dashboard.
+
 ## 2026-05-09 — SvelteKit web UI slice
 
 The local web UI in `apps/web` expects the Go API to be running first:
