@@ -58,6 +58,26 @@ Go workflow service
 
 This keeps the workflow reliable while still taking advantage of React and Remotion for media generation.
 
+## AI Provider Configuration
+
+The CLI MVP is usable without an LLM API key. It records custom revision instructions and creates deterministic draft briefs locally.
+
+Future AI-assisted research, brief generation, and revision commands should read provider configuration from environment variables instead of hardcoding secrets:
+
+```text
+HERMENEIA_LLM_PROVIDER=openai
+HERMENEIA_LLM_API_KEY=
+HERMENEIA_LLM_BASE_URL=
+HERMENEIA_LLM_MODEL=
+```
+
+Guidelines:
+
+- Keep real API keys in local `.env` files or secret managers.
+- Commit only placeholder values in `.env.example`.
+- Treat `HERMENEIA_LLM_BASE_URL` as optional for OpenAI-compatible gateways or self-hosted providers.
+- Keep prompt input/output inspectable by storing generated briefs and revisions as normal Hermeneia artifacts.
+
 ## MVP Storage
 
 Start with SQLite as the durable local database, while keeping exported run artifacts in folders:

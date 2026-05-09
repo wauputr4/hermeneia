@@ -113,6 +113,21 @@ By default, `hermeneia init` creates or migrates `data/hermeneia.db`. To use an 
 HERMENEIA_DATABASE_PATH=/tmp/hermeneia.db go run ./cmd/hermeneia init
 ```
 
+The current MVP does not require an LLM API key. Custom instructions are supported through deterministic revision commands:
+
+```bash
+go run ./cmd/hermeneia revise <run-id> --instruction "Make the hook sharper"
+```
+
+Future AI-assisted commands should use the optional variables declared in `.env.example`:
+
+```text
+HERMENEIA_LLM_PROVIDER
+HERMENEIA_LLM_API_KEY
+HERMENEIA_LLM_BASE_URL
+HERMENEIA_LLM_MODEL
+```
+
 Current CLI surface:
 
 - `hermeneia init` initializes SQLite storage.
