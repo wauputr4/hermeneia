@@ -125,6 +125,12 @@ OPENAI_BASE_URL=
 OPENAI_MODEL=
 ```
 
+Release and deployment notes:
+
+- [Changelog](CHANGELOG.md)
+- [Deployment](docs/deployment.md)
+- [Release process](docs/release.md)
+
 Current CLI surface:
 
 - `hermeneia init` initializes SQLite storage.
