@@ -125,9 +125,9 @@ In the current CLI MVP, this instruction is recorded deterministically in SQLite
 Optional future OpenAI configuration:
 
 ```text
-OPENAI_API_KEY
-OPENAI_BASE_URL
-OPENAI_MODEL
+OPENAI_API_KEY=
+OPENAI_BASE_URL=
+OPENAI_MODEL=
 ```
 
 These variables are intentionally optional for the MVP. They should be required only when commands actually call OpenAI for research, brief generation, or AI-assisted revision.
