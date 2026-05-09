@@ -247,6 +247,42 @@ func TestServiceCreateRunPreservesExistingRunOnIDCollision(t *testing.T) {
 	}
 }
 
+func TestServiceCleanupUsesUncancelledContext(t *testing.T) {
+	ctx := context.Background()
+	db, err := storage.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := storage.Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+
+	repo := storage.NewRepository(db)
+	if err := repo.EnsureTemplate(ctx, storage.Template{ID: "carousel/ai-news-clean", Name: "AI News Clean Carousel", ContentType: "carousel"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.CreateContentRun(ctx, storage.ContentRun{ID: "run-cancel-cleanup", Topic: "AI agents", ContentType: "carousel", TemplateID: "carousel/ai-news-clean"}); err != nil {
+		t.Fatal(err)
+	}
+
+	service := NewService(repo, runfiles.New(t.TempDir()))
+	if err := service.Files.PrepareRun("run-cancel-cleanup"); err != nil {
+		t.Fatal(err)
+	}
+
+	canceledCtx, cancel := context.WithCancel(ctx)
+	cancel()
+	service.cleanupPreparedRun(canceledCtx, "run-cancel-cleanup", true)
+
+	if _, err := repo.GetContentRun(ctx, "run-cancel-cleanup"); err != sql.ErrNoRows {
+		t.Fatalf("expected canceled-context cleanup to delete content run, got %v", err)
+	}
+	if _, err := os.Stat(service.Files.RunDir("run-cancel-cleanup")); !os.IsNotExist(err) {
+		t.Fatalf("expected canceled-context cleanup to remove runfiles, got %v", err)
+	}
+}
+
 func TestServiceShowRunRequiresExistingRun(t *testing.T) {
 	ctx := context.Background()
 	db, err := storage.Open(":memory:")

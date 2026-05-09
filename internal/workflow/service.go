@@ -184,8 +184,10 @@ func (s Service) cleanupCreatedRun(ctx context.Context, runID string) {
 }
 
 func (s Service) cleanupPreparedRun(ctx context.Context, runID string, deleteDB bool) {
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
 	if deleteDB {
-		_ = s.Repo.DeleteContentRun(ctx, runID)
+		_ = s.Repo.DeleteContentRun(cleanupCtx, runID)
 	}
 	_ = s.Files.RemoveRun(runID)
 }
