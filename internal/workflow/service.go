@@ -461,14 +461,15 @@ func (s Service) RenderRun(ctx context.Context, runID string) (RenderResult, err
 		return RenderResult{}, err
 	}
 
-	artifacts := make([]storage.Artifact, 0, len(files))
+	artifactIDs := make([]string, 0, len(files))
 	for i, file := range files {
 		checksum, err := runfiles.Checksum(file.Path)
 		if err != nil {
 			return RenderResult{}, err
 		}
+		artifactID := s.newID("artifact", fmt.Sprintf("%s-%d", file.Kind, i+1))
 		artifact := storage.Artifact{
-			ID:             s.newID("artifact", fmt.Sprintf("%s-%d", file.Kind, i+1)),
+			ID:             artifactID,
 			RunID:          runID,
 			BriefVersionID: latest.ID,
 			Kind:           file.Kind,
@@ -478,11 +479,11 @@ func (s Service) RenderRun(ctx context.Context, runID string) (RenderResult, err
 		if err := s.Repo.CreateArtifact(ctx, artifact); err != nil {
 			return RenderResult{}, err
 		}
-		storedArtifact, err := s.Repo.GetArtifact(ctx, artifact.ID)
-		if err != nil {
-			return RenderResult{}, err
-		}
-		artifacts = append(artifacts, storedArtifact)
+		artifactIDs = append(artifactIDs, artifactID)
+	}
+	artifacts, err := s.Repo.ListArtifactsByIDs(ctx, artifactIDs)
+	if err != nil {
+		return RenderResult{}, err
 	}
 	if err := runfiles.AppendText(s.Files.HistoryPath(runID), fmt.Sprintf("- rendered %s artifacts from brief v%d.\n", run.ContentType, latest.Version)); err != nil {
 		return RenderResult{}, err
