@@ -10,6 +10,8 @@ This documentation describes the project concept, architecture, MVP scope, roadm
 - [Technology Stack](tech-stack.md)
 - [Workflow](workflow.md)
 - [Schemas](schemas.md)
+- [Deployment](deployment.md)
+- [Release Process](release.md)
 - [MVP Definition and Non-Goals](mvp.md)
 - [MVP Roadmap](roadmap.md)
 - [Template System](templates.md)
