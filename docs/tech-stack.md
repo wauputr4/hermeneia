@@ -73,6 +73,7 @@ OPENAI_MODEL=
 Guidelines:
 
 - Keep real API keys in local `.env` files or secret managers.
+- Use `hermeneia research --planner openai` only when both `OPENAI_API_KEY` and `OPENAI_MODEL` are set; otherwise the CLI stays on the deterministic local planner.
 - Commit only placeholder values in `.env.example`.
 - Treat `OPENAI_BASE_URL` as optional for the official OpenAI API and useful for compatible gateways.
 - Keep prompt input/output inspectable by storing generated briefs and revisions as normal Hermeneia artifacts.

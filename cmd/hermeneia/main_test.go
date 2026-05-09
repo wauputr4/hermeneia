@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/wauputr4/hermeneia/internal/workflow"
 )
 
 func TestHelpOutputIncludesMVPCommandSurface(t *testing.T) {
@@ -122,6 +124,44 @@ func TestCLIResearchRejectsStrayArgsWhenTopicIsSet(t *testing.T) {
 	}
 	if got := err.Error(); !strings.Contains(got, "unexpected positional argument") {
 		t.Fatalf("unexpected error: %q", got)
+	}
+}
+
+func TestCLIResearchOpenAIPlannerRequiresConfig(t *testing.T) {
+	ctx := context.Background()
+	var stdout bytes.Buffer
+	dbPath := filepath.Join(t.TempDir(), "hermeneia.db")
+	runsRoot := filepath.Join(t.TempDir(), "runs")
+	t.Setenv("HERMENEIA_DATABASE_PATH", dbPath)
+	t.Setenv("OPENAI_API_KEY", "")
+	t.Setenv("OPENAI_MODEL", "")
+
+	cmd := command{stdout: &stdout, runsRoot: runsRoot}
+	err := cmd.run(ctx, []string{
+		"research",
+		"--topic", "AI agents",
+		"--source", "https://example.com/agents",
+		"--planner", "openai",
+	})
+	if err == nil {
+		t.Fatal("expected missing OpenAI config error")
+	}
+	if got := err.Error(); !strings.Contains(got, "OPENAI_API_KEY") || !strings.Contains(got, "OPENAI_MODEL") {
+		t.Fatalf("unexpected error: %q", got)
+	}
+}
+
+func TestResearchPlannerFromEnvConfiguresReusableHTTPClient(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "test-key")
+	t.Setenv("OPENAI_MODEL", "test-model")
+	t.Setenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+
+	planner, ok := researchPlannerFromEnv().(workflow.OpenAIResearchPlanner)
+	if !ok {
+		t.Fatalf("expected OpenAI planner, got %T", researchPlannerFromEnv())
+	}
+	if planner.HTTPClient == nil {
+		t.Fatal("expected reusable HTTP client")
 	}
 }
 

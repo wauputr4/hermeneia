@@ -33,7 +33,7 @@ The MVP CLI starts with manually supplied source URLs:
 hermeneia research --topic "AI agents in marketing" --source "https://example.com/ai-agents"
 ```
 
-This writes `research.json` into the run folder, preserves every source URL for traceability, and generates the first schema-valid brief draft from the research plan. Future AI research providers can enrich the same research contract with summaries, rankings, and source metadata.
+This writes `research.json` into the run folder, preserves every source URL for traceability, and generates the first schema-valid brief draft from the research plan. By default the planner is deterministic. When `OPENAI_API_KEY` and `OPENAI_MODEL` are configured, `hermeneia research --planner openai` can use the OpenAI Responses API to summarize the supplied source metadata and rank ideas while preserving the same stored research contract.
 
 ## 2. Brief
 

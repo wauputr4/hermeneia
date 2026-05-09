@@ -4,6 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -147,6 +150,118 @@ func TestServiceCreateRunFromResearchStoresTraceablePlan(t *testing.T) {
 	}
 	if !strings.Contains(brief.BodyJSON, "source-backed") {
 		t.Fatalf("brief was not generated from research plan: %s", brief.BodyJSON)
+	}
+}
+
+func TestServiceCreateRunFromResearchDefaultsToDeterministicPlanner(t *testing.T) {
+	ctx := context.Background()
+	db, err := storage.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := storage.Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+
+	service := NewService(storage.NewRepository(db), runfiles.New(t.TempDir()))
+	service.Planner = OpenAIResearchPlanner{APIKey: "test-key", Model: "test-model", BaseURL: "http://127.0.0.1:1"}
+	service.NewID = func(prefix, seed string) string {
+		switch prefix {
+		case "run":
+			return "run-default-deterministic-research"
+		case "artifact":
+			return "artifact-default-deterministic-research-json"
+		default:
+			return prefix + "-test"
+		}
+	}
+
+	result, err := service.CreateRunFromResearch(ctx, ResearchInput{
+		Topic:       "AI agents in marketing",
+		ContentType: "carousel",
+		Sources:     []ResearchSource{{URL: "https://example.com/agents"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(result.ResearchPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var plan ResearchPlan
+	if err := json.Unmarshal(data, &plan); err != nil {
+		t.Fatal(err)
+	}
+	if plan.Planner != "deterministic" {
+		t.Fatalf("expected deterministic planner by default, got %q", plan.Planner)
+	}
+}
+
+func TestServiceCreateRunFromResearchUsesOpenAIPlanner(t *testing.T) {
+	ctx := context.Background()
+	db, err := storage.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := storage.Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+
+	var sawAuth bool
+	openai := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/responses" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		sawAuth = r.Header.Get("Authorization") == "Bearer test-key"
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"output":[{"content":[{"type":"output_text","text":"{\"topic\":\"ignored\",\"sources\":[],\"summary\":\"AI planning signal from supplied sources.\",\"ideas\":[{\"title\":\"Agent workflow adoption\",\"reason\":\"The source note points to practical AI agent usage.\",\"rank\":1}],\"content_type\":\"carousel\",\"template_id\":\"carousel/ai-news-clean\",\"planner\":\"openai\"}"}]}]}`)
+	}))
+	defer openai.Close()
+
+	service := NewService(storage.NewRepository(db), runfiles.New(t.TempDir()))
+	service.Planner = OpenAIResearchPlanner{APIKey: "test-key", Model: "test-model", BaseURL: openai.URL, HTTPClient: openai.Client()}
+	service.NewID = func(prefix, seed string) string {
+		switch prefix {
+		case "run":
+			return "run-openai-research"
+		case "artifact":
+			return "artifact-openai-research-json"
+		default:
+			return prefix + "-test"
+		}
+	}
+
+	result, err := service.CreateRunFromResearch(ctx, ResearchInput{
+		Topic:       "AI agents in marketing",
+		ContentType: "carousel",
+		Planner:     "openai",
+		Sources:     []ResearchSource{{URL: "https://example.com/agents", Note: "Agent workflow adoption"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sawAuth {
+		t.Fatal("expected OpenAI authorization header")
+	}
+	data, err := os.ReadFile(result.ResearchPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var plan ResearchPlan
+	if err := json.Unmarshal(data, &plan); err != nil {
+		t.Fatal(err)
+	}
+	if plan.Planner != "openai" || len(plan.Sources) != 1 || plan.Sources[0].URL != "https://example.com/agents" {
+		t.Fatalf("unexpected OpenAI plan: %#v", plan)
+	}
+	brief, err := service.Repo.GetLatestBriefVersion(ctx, result.Run.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(brief.BodyJSON, "Agent workflow adoption") {
+		t.Fatalf("brief did not use OpenAI research idea: %s", brief.BodyJSON)
 	}
 }
 

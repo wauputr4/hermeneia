@@ -103,6 +103,7 @@ go run ./cmd/hermeneia help
 go run ./cmd/hermeneia init
 go run ./cmd/hermeneia create --topic "AI agents in marketing" --type carousel
 go run ./cmd/hermeneia research --topic "AI agents in marketing" --source "https://example.com/ai-agents"
+go run ./cmd/hermeneia research --topic "AI agents in marketing" --planner openai --source "https://example.com/ai-agents"
 go run ./cmd/hermeneia revise <run-id> --instruction "Make the hook sharper"
 go run ./cmd/hermeneia render <run-id>
 go run ./cmd/hermeneia show <run-id>
@@ -114,7 +115,7 @@ By default, `hermeneia init` creates or migrates `data/hermeneia.db`. To use an 
 HERMENEIA_DATABASE_PATH=/tmp/hermeneia.db go run ./cmd/hermeneia init
 ```
 
-The current MVP does not require an OpenAI API key; custom instructions are supported through the deterministic `revise` command listed above.
+The current MVP does not require an OpenAI API key; custom instructions are supported through the deterministic `revise` command listed above. Research runs default to a deterministic local planner unless `--planner openai` is requested explicitly.
 
 Future AI-assisted commands should use the optional OpenAI variables declared in `.env.example`:
 
@@ -129,6 +130,7 @@ Current CLI surface:
 - `hermeneia init` initializes SQLite storage.
 - `hermeneia create` creates a run, writes `brief.v1.json`, and stores SQLite metadata.
 - `hermeneia research` creates a run from traceable source URLs, writes `research.json`, and generates a schema-valid brief draft.
+- `hermeneia research --planner openai` uses the optional OpenAI Responses API planner when `OPENAI_API_KEY` and `OPENAI_MODEL` are configured.
 - `hermeneia list` lists stored runs.
 - `hermeneia show` displays run, version, revision, and artifact counts.
 - `hermeneia revise` creates the next brief version and records a revision event. In the MVP it applies a deterministic revision note instead of calling OpenAI.

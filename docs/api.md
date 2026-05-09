@@ -94,6 +94,7 @@ Request:
 {
   "topic": "AI agents in marketing",
   "content_type": "carousel",
+  "planner": "deterministic",
   "sources": [
     {
       "url": "https://example.com/ai-agents",
@@ -105,7 +106,9 @@ Request:
 ```
 
 Returns `201 Created` with the run, first brief, `research.json` path, and
-research artifact metadata.
+research artifact metadata. Set `"planner": "openai"` to use the optional
+OpenAI planner when `OPENAI_API_KEY` and `OPENAI_MODEL` are configured by the
+server process.
 
 ### Show Run
 
