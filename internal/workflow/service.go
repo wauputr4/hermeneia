@@ -144,33 +144,50 @@ func (s Service) createRunWithBrief(ctx context.Context, input CreateInput, cont
 	if err := s.Files.PrepareRun(runID); err != nil {
 		return CreateResult{}, err
 	}
+	runCreated := false
+	fail := func(err error) (CreateResult, error) {
+		s.cleanupPreparedRun(ctx, runID, runCreated)
+		return CreateResult{}, err
+	}
 
 	body, err := marshalBrief(b)
 	if err != nil {
-		return CreateResult{}, err
+		return fail(err)
 	}
 
 	if err := s.Repo.EnsureTemplate(ctx, storage.Template{ID: templateID, Name: templateName(templateID), ContentType: contentType}); err != nil {
-		return CreateResult{}, err
+		return fail(err)
 	}
 	run := storage.ContentRun{ID: runID, Topic: b.Topic, ContentType: contentType, TemplateID: templateID}
 	if err := s.Repo.CreateContentRun(ctx, run); err != nil {
-		return CreateResult{}, err
+		return fail(err)
 	}
+	runCreated = true
 	version := storage.BriefVersion{ID: briefID(runID, 1), RunID: runID, Version: 1, BodyJSON: body}
 	if err := s.Repo.CreateBriefVersion(ctx, version); err != nil {
-		return CreateResult{}, err
+		return fail(err)
 	}
 
 	briefPath := s.Files.BriefPath(runID, 1)
 	if err := runfiles.WriteJSON(briefPath, b); err != nil {
-		return CreateResult{}, err
+		return fail(err)
 	}
 	historyPath := s.Files.HistoryPath(runID)
 	if err := runfiles.WriteText(historyPath, "# Hermeneia Run History\n\n"+historyEntry); err != nil {
-		return CreateResult{}, err
+		return fail(err)
 	}
 	return CreateResult{Run: run, Brief: version, BriefPath: briefPath, HistoryPath: historyPath}, nil
+}
+
+func (s Service) cleanupCreatedRun(ctx context.Context, runID string) {
+	s.cleanupPreparedRun(ctx, runID, true)
+}
+
+func (s Service) cleanupPreparedRun(ctx context.Context, runID string, deleteDB bool) {
+	if deleteDB {
+		_ = s.Repo.DeleteContentRun(ctx, runID)
+	}
+	_ = s.Files.RemoveRun(runID)
 }
 
 func (s Service) CreateRunFromResearch(ctx context.Context, input ResearchInput) (ResearchResult, error) {
@@ -204,14 +221,18 @@ func (s Service) CreateRunFromResearch(ctx context.Context, input ResearchInput)
 	if err != nil {
 		return ResearchResult{}, err
 	}
+	fail := func(err error) (ResearchResult, error) {
+		s.cleanupCreatedRun(ctx, created.Run.ID)
+		return ResearchResult{}, err
+	}
 
 	researchPath := s.Files.ResearchPath(created.Run.ID)
 	if err := runfiles.WriteJSON(researchPath, plan); err != nil {
-		return ResearchResult{}, err
+		return fail(err)
 	}
 	checksum, err := runfiles.Checksum(researchPath)
 	if err != nil {
-		return ResearchResult{}, err
+		return fail(err)
 	}
 	artifact := storage.Artifact{
 		ID:             s.newID("artifact", "research-json"),
@@ -222,10 +243,10 @@ func (s Service) CreateRunFromResearch(ctx context.Context, input ResearchInput)
 		Checksum:       checksum,
 	}
 	if err := s.Repo.CreateArtifact(ctx, artifact); err != nil {
-		return ResearchResult{}, err
+		return fail(err)
 	}
 	if err := runfiles.AppendText(created.HistoryPath, fmt.Sprintf("- research plan stored from %d source URLs.\n", len(sources))); err != nil {
-		return ResearchResult{}, err
+		return fail(err)
 	}
 	return ResearchResult{CreateResult: created, ResearchPath: researchPath, ResearchArtifact: artifact}, nil
 }

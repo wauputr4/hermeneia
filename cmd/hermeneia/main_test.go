@@ -107,6 +107,23 @@ func TestCLIResearchCreatesTraceableRun(t *testing.T) {
 	}
 }
 
+func TestCLIResearchRejectsStrayArgsWhenTopicIsSet(t *testing.T) {
+	cmd := command{stdout: &bytes.Buffer{}}
+
+	err := cmd.run(context.Background(), []string{
+		"research",
+		"--topic", "AI agents",
+		"--source", "https://example.com/agents",
+		"https://example.com/marketing",
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if got := err.Error(); !strings.Contains(got, "unexpected positional argument") {
+		t.Fatalf("unexpected error: %q", got)
+	}
+}
+
 func TestCLIContentRunWorkflow(t *testing.T) {
 	ctx := context.Background()
 	var stdout bytes.Buffer

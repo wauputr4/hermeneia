@@ -298,11 +298,13 @@ func parseReviseArgs(args []string) (string, string, error) {
 func parseResearchArgs(args []string) (workflow.ResearchInput, error) {
 	var input workflow.ResearchInput
 	var topicParts []string
+	topicSetExplicitly := false
 	input.ContentType = "carousel"
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		if value, ok := strings.CutPrefix(arg, "--topic="); ok {
 			input.Topic = value
+			topicSetExplicitly = true
 			continue
 		}
 		if value, ok := strings.CutPrefix(arg, "--type="); ok {
@@ -336,6 +338,7 @@ func parseResearchArgs(args []string) (workflow.ResearchInput, error) {
 				return input, errors.New("--topic requires a value")
 			}
 			input.Topic = args[i]
+			topicSetExplicitly = true
 		case "--type":
 			i++
 			if i >= len(args) {
@@ -378,6 +381,9 @@ func parseResearchArgs(args []string) (workflow.ResearchInput, error) {
 			}
 			topicParts = append(topicParts, arg)
 		}
+	}
+	if topicSetExplicitly && len(topicParts) > 0 {
+		return input, fmt.Errorf("unexpected positional argument %q when --topic is set", strings.Join(topicParts, " "))
 	}
 	if input.Topic == "" && len(topicParts) > 0 {
 		input.Topic = strings.Join(topicParts, " ")
