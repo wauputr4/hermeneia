@@ -175,6 +175,10 @@ func (r *Repository) CreateBriefVersion(ctx context.Context, bv BriefVersion) er
 	_, err := r.db.ExecContext(ctx, `INSERT INTO brief_versions (id, run_id, version, body_json) VALUES (?, ?, ?, ?)`, bv.ID, bv.RunID, bv.Version, bv.BodyJSON)
 	return err
 }
+func (r *Repository) UpdateBriefVersionBody(ctx context.Context, id, runID, bodyJSON string) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE brief_versions SET body_json = ? WHERE id = ? AND run_id = ?`, bodyJSON, id, runID)
+	return err
+}
 func (r *Repository) GetBriefVersion(ctx context.Context, id string) (BriefVersion, error) {
 	var bv BriefVersion
 	err := r.db.QueryRowContext(ctx, `SELECT id, run_id, version, body_json, created_at FROM brief_versions WHERE id = ?`, id).Scan(&bv.ID, &bv.RunID, &bv.Version, &bv.BodyJSON, &bv.CreatedAt)

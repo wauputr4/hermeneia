@@ -48,11 +48,48 @@ type CreateInput struct {
 	TargetAudience string
 }
 
+type ResearchInput struct {
+	Topic          string
+	ContentType    string
+	TemplateID     string
+	Platform       string
+	Tone           string
+	TargetAudience string
+	Sources        []ResearchSource
+}
+
+type ResearchSource struct {
+	URL   string `json:"url"`
+	Note  string `json:"note,omitempty"`
+	Title string `json:"title,omitempty"`
+}
+
+type ResearchPlan struct {
+	Topic       string           `json:"topic"`
+	Sources     []ResearchSource `json:"sources"`
+	Summary     string           `json:"summary"`
+	Ideas       []ResearchIdea   `json:"ideas"`
+	ContentType string           `json:"content_type"`
+	TemplateID  string           `json:"template_id"`
+}
+
+type ResearchIdea struct {
+	Title  string `json:"title"`
+	Reason string `json:"reason"`
+	Rank   int    `json:"rank"`
+}
+
 type CreateResult struct {
 	Run         storage.ContentRun
 	Brief       storage.BriefVersion
 	BriefPath   string
 	HistoryPath string
+}
+
+type ResearchResult struct {
+	CreateResult
+	ResearchPath     string
+	ResearchArtifact storage.Artifact
 }
 
 type ReviseResult struct {
@@ -130,6 +167,70 @@ func (s Service) CreateRun(ctx context.Context, input CreateInput) (CreateResult
 		return CreateResult{}, err
 	}
 	return CreateResult{Run: run, Brief: version, BriefPath: briefPath, HistoryPath: historyPath}, nil
+}
+
+func (s Service) CreateRunFromResearch(ctx context.Context, input ResearchInput) (ResearchResult, error) {
+	contentType, err := normalizeContentType(input.ContentType)
+	if err != nil {
+		return ResearchResult{}, err
+	}
+	if strings.TrimSpace(input.Topic) == "" {
+		return ResearchResult{}, errors.New("topic is required")
+	}
+	sources := normalizeResearchSources(input.Sources)
+	if len(sources) == 0 {
+		return ResearchResult{}, errors.New("at least one source URL is required")
+	}
+	templateID := strings.TrimSpace(input.TemplateID)
+	if templateID == "" {
+		templateID = defaultTemplate(contentType)
+	}
+
+	createInput := CreateInput{
+		Topic:          input.Topic,
+		ContentType:    contentType,
+		TemplateID:     templateID,
+		Tone:           input.Tone,
+		Platform:       input.Platform,
+		TargetAudience: input.TargetAudience,
+	}
+	created, err := s.CreateRun(ctx, createInput)
+	if err != nil {
+		return ResearchResult{}, err
+	}
+
+	plan := draftResearchPlan(input.Topic, contentType, templateID, sources)
+	researchPath := s.Files.ResearchPath(created.Run.ID)
+	if err := runfiles.WriteJSON(researchPath, plan); err != nil {
+		return ResearchResult{}, err
+	}
+	if err := s.replaceBriefWithResearchPlan(ctx, created.Run.ID, created.Brief.ID, createInput, plan); err != nil {
+		return ResearchResult{}, err
+	}
+	created.Brief, err = s.Repo.GetBriefVersion(ctx, created.Brief.ID)
+	if err != nil {
+		return ResearchResult{}, err
+	}
+	checksum, err := runfiles.Checksum(researchPath)
+	if err != nil {
+		return ResearchResult{}, err
+	}
+	artifact := storage.Artifact{
+		ID:             s.newID("artifact", "research-json"),
+		RunID:          created.Run.ID,
+		BriefVersionID: created.Brief.ID,
+		Kind:           "research_json",
+		Path:           filepath.Clean(researchPath),
+		Checksum:       checksum,
+	}
+	if err := s.Repo.CreateArtifact(ctx, artifact); err != nil {
+		return ResearchResult{}, err
+	}
+	if err := runfiles.AppendText(created.HistoryPath, fmt.Sprintf("- research plan stored from %d source URLs.\n", len(sources))); err != nil {
+		return ResearchResult{}, err
+	}
+	created.BriefPath = s.Files.BriefPath(created.Run.ID, 1)
+	return ResearchResult{CreateResult: created, ResearchPath: researchPath, ResearchArtifact: artifact}, nil
 }
 
 func (s Service) ListRuns(ctx context.Context) ([]storage.ContentRun, error) {
@@ -326,6 +427,69 @@ func draftBrief(input CreateInput, contentType, templateID string) brief.Brief {
 		CaptionDraft:    "A structured first draft about " + topic + ", ready for review and revision.",
 		Hashtags:        []string{"#Hermeneia", "#ContentWorkflow", "#AI"},
 	}
+}
+
+func draftBriefFromResearch(input CreateInput, plan ResearchPlan) brief.Brief {
+	b := draftBrief(input, plan.ContentType, plan.TemplateID)
+	b.Angle = "A source-backed editorial take on " + plan.Topic
+	b.Hook = "The signal behind " + plan.Topic
+	b.KeyPoints = make([]string, 0, len(plan.Ideas)+1)
+	b.KeyPoints = append(b.KeyPoints, plan.Summary)
+	for _, idea := range plan.Ideas {
+		b.KeyPoints = append(b.KeyPoints, idea.Title+": "+idea.Reason)
+	}
+	b.VisualDirection = "Source-backed editorial layout with clear citations, readable hierarchy, and traceable claims"
+	b.CaptionDraft = "Research-backed brief about " + plan.Topic + ". Review the source URLs in research.json before rendering."
+	return b
+}
+
+func draftResearchPlan(topic, contentType, templateID string, sources []ResearchSource) ResearchPlan {
+	ideas := make([]ResearchIdea, 0, len(sources))
+	for i, source := range sources {
+		label := source.Title
+		if label == "" {
+			label = source.URL
+		}
+		reason := source.Note
+		if reason == "" {
+			reason = "Source preserved for editorial review and traceability."
+		}
+		ideas = append(ideas, ResearchIdea{Title: label, Reason: reason, Rank: i + 1})
+	}
+	return ResearchPlan{
+		Topic:       strings.TrimSpace(topic),
+		Sources:     sources,
+		Summary:     fmt.Sprintf("Research seed for %q using %d traceable source URLs.", strings.TrimSpace(topic), len(sources)),
+		Ideas:       ideas,
+		ContentType: contentType,
+		TemplateID:  templateID,
+	}
+}
+
+func normalizeResearchSources(sources []ResearchSource) []ResearchSource {
+	out := make([]ResearchSource, 0, len(sources))
+	for _, source := range sources {
+		source.URL = strings.TrimSpace(source.URL)
+		source.Note = strings.TrimSpace(source.Note)
+		source.Title = strings.TrimSpace(source.Title)
+		if source.URL == "" {
+			continue
+		}
+		out = append(out, source)
+	}
+	return out
+}
+
+func (s Service) replaceBriefWithResearchPlan(ctx context.Context, runID, briefID string, input CreateInput, plan ResearchPlan) error {
+	b := draftBriefFromResearch(input, plan)
+	body, err := marshalBrief(b)
+	if err != nil {
+		return err
+	}
+	if err := s.Repo.UpdateBriefVersionBody(ctx, briefID, runID, body); err != nil {
+		return err
+	}
+	return runfiles.WriteJSON(s.Files.BriefPath(runID, 1), b)
 }
 
 func marshalBrief(b brief.Brief) (string, error) {

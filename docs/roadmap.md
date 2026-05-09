@@ -84,6 +84,13 @@ Deliverables:
 - Content idea ranking.
 - Brief generation from research.
 
+Initial CLI slice:
+
+- `hermeneia research` accepts curated source URLs with `--source`.
+- The run folder stores inspectable `research.json`.
+- SQLite records the research file as a `research_json` artifact.
+- The first brief is generated from the research plan while preserving the normal revise/render workflow.
+
 ## Phase 6 — Scheduling and Publishing
 
 Goal:

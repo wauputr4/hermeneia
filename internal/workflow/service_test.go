@@ -3,6 +3,7 @@ package workflow
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -89,6 +90,63 @@ func TestServiceCreateReviseAndRenderCarouselRun(t *testing.T) {
 	}
 	if !strings.Contains(string(history), "Make the hook sharper") {
 		t.Fatalf("history missing revision instruction:\n%s", history)
+	}
+}
+
+func TestServiceCreateRunFromResearchStoresTraceablePlan(t *testing.T) {
+	ctx := context.Background()
+	db, err := storage.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := storage.Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+
+	service := NewService(storage.NewRepository(db), runfiles.New(t.TempDir()))
+	service.NewID = func(prefix, seed string) string {
+		switch prefix {
+		case "run":
+			return "run-research-ai"
+		case "artifact":
+			return "artifact-research-json"
+		default:
+			return prefix + "-test"
+		}
+	}
+
+	result, err := service.CreateRunFromResearch(ctx, ResearchInput{
+		Topic:       "AI agents in marketing",
+		ContentType: "carousel",
+		Sources: []ResearchSource{
+			{URL: "https://example.com/agents", Note: "Agent adoption signal"},
+			{URL: "https://example.com/marketing", Title: "Marketing workflows"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.ResearchArtifact.Kind != "research_json" || result.ResearchArtifact.Checksum == "" {
+		t.Fatalf("unexpected research artifact: %#v", result.ResearchArtifact)
+	}
+	data, err := os.ReadFile(result.ResearchPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var plan ResearchPlan
+	if err := json.Unmarshal(data, &plan); err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Sources) != 2 || plan.Sources[0].URL != "https://example.com/agents" {
+		t.Fatalf("source URLs were not preserved: %#v", plan.Sources)
+	}
+	brief, err := service.Repo.GetLatestBriefVersion(ctx, result.Run.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(brief.BodyJSON, "source-backed") {
+		t.Fatalf("brief was not generated from research plan: %s", brief.BodyJSON)
 	}
 }
 

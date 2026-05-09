@@ -49,6 +49,10 @@ func (s Store) ContentPath(runID string) string {
 	return filepath.Join(s.RunDir(runID), "content.json")
 }
 
+func (s Store) ResearchPath(runID string) string {
+	return filepath.Join(s.RunDir(runID), "research.json")
+}
+
 func (s Store) HistoryPath(runID string) string {
 	return filepath.Join(s.RunDir(runID), "history.md")
 }

@@ -27,6 +27,14 @@ Research can come from:
 
 Output should be a structured research summary.
 
+The MVP CLI starts with manually supplied source URLs:
+
+```bash
+hermeneia research --topic "AI agents in marketing" --source "https://example.com/ai-agents"
+```
+
+This writes `research.json` into the run folder, preserves every source URL for traceability, and generates the first schema-valid brief draft from the research plan. Future AI research providers can enrich the same research contract with summaries, rankings, and source metadata.
+
 ## 2. Brief
 
 A brief should contain:
@@ -124,6 +132,7 @@ Generated run files use this deterministic layout:
 runs/{run-id}/
 ├─ brief.v1.json
 ├─ brief.v2.json
+├─ research.json
 ├─ content.json
 ├─ history.md
 └─ output/

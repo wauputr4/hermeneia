@@ -66,6 +66,8 @@ func (c command) run(ctx context.Context, args []string) error {
 		return nil
 	case "create":
 		return c.create(ctx, args[1:])
+	case "research":
+		return c.research(ctx, args[1:])
 	case "list":
 		return c.list(ctx, args[1:])
 	case "show":
@@ -77,6 +79,17 @@ func (c command) run(ctx context.Context, args []string) error {
 	default:
 		return fmt.Errorf("unknown command %q; run \"hermeneia help\" for usage", args[0])
 	}
+}
+
+type stringList []string
+
+func (s *stringList) String() string {
+	return strings.Join(*s, ",")
+}
+
+func (s *stringList) Set(value string) error {
+	*s = append(*s, value)
+	return nil
 }
 
 func (c command) create(ctx context.Context, args []string) error {
@@ -100,6 +113,36 @@ func (c command) create(ctx context.Context, args []string) error {
 			return err
 		}
 		fmt.Fprintf(c.stdout, "created run %s\nbrief %s\n", result.Run.ID, result.BriefPath)
+		return nil
+	})
+}
+
+func (c command) research(ctx context.Context, args []string) error {
+	fs := c.flagSet("research")
+	var sources stringList
+	var input workflow.ResearchInput
+	fs.StringVar(&input.Topic, "topic", "", "content topic")
+	fs.StringVar(&input.ContentType, "type", "carousel", "content type: carousel or short_video")
+	fs.StringVar(&input.TemplateID, "template", "", "template id")
+	fs.StringVar(&input.Tone, "tone", "", "brief tone")
+	fs.StringVar(&input.Platform, "platform", "", "target platform")
+	fs.StringVar(&input.TargetAudience, "audience", "", "target audience")
+	fs.Var(&sources, "source", "source URL; repeat for multiple sources")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if input.Topic == "" && fs.NArg() > 0 {
+		input.Topic = strings.Join(fs.Args(), " ")
+	}
+	for _, source := range sources {
+		input.Sources = append(input.Sources, workflow.ResearchSource{URL: source})
+	}
+	return c.withService(ctx, func(s workflow.Service) error {
+		result, err := s.CreateRunFromResearch(ctx, input)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(c.stdout, "created research run %s\nresearch %s\nbrief %s\n", result.Run.ID, result.ResearchPath, result.BriefPath)
 		return nil
 	})
 }
@@ -284,6 +327,7 @@ func (c command) printUsage() {
 Usage:
   hermeneia init              initialize the SQLite database
   hermeneia create            create a content run
+  hermeneia research          create a run from traceable research sources
   hermeneia list              list content runs
   hermeneia show              show a content run
   hermeneia revise            create a new brief revision
@@ -298,6 +342,7 @@ Configuration:
 
 Examples:
   hermeneia create --topic "AI agents in marketing" --type carousel
+  hermeneia research --topic "AI agents" --source "https://example.com/news"
   hermeneia revise <run-id> --instruction "Make the hook sharper"
   hermeneia render <run-id>`)
 }
