@@ -122,7 +122,23 @@ brief.v2.json
 history.md
 ```
 
-The MVP CLI revision path is deterministic. It records the revision instruction, creates the next brief version, and adds a visible revision note. Later AI-assisted revision can replace that placeholder while keeping the same append-only version contract.
+Custom instructions enter the MVP workflow through revision commands:
+
+```bash
+hermeneia revise <run-id> --instruction "Make the hook sharper and more practical"
+```
+
+In the current CLI MVP, this instruction is recorded deterministically in SQLite and `history.md`, reflected into the next brief version, and never sent to OpenAI. Future AI-assisted revision can replace that deterministic placeholder while keeping the same append-only version contract.
+
+Optional future OpenAI configuration:
+
+```text
+OPENAI_API_KEY=
+OPENAI_BASE_URL=
+OPENAI_MODEL=
+```
+
+These variables are intentionally optional for the MVP. They should be required only when commands actually call OpenAI for research, brief generation, or AI-assisted revision.
 
 ## File Artifact Convention
 

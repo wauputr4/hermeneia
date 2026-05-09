@@ -58,6 +58,25 @@ Go workflow service
 
 This keeps the workflow reliable while still taking advantage of React and Remotion for media generation.
 
+## OpenAI Configuration
+
+The CLI MVP is usable without an OpenAI API key. It records custom revision instructions and creates deterministic draft briefs locally.
+
+Future AI-assisted research, brief generation, and revision commands should read OpenAI configuration from environment variables instead of hardcoding secrets:
+
+```text
+OPENAI_API_KEY=
+OPENAI_BASE_URL=
+OPENAI_MODEL=
+```
+
+Guidelines:
+
+- Keep real API keys in local `.env` files or secret managers.
+- Commit only placeholder values in `.env.example`.
+- Treat `OPENAI_BASE_URL` as optional for the official OpenAI API and useful for compatible gateways.
+- Keep prompt input/output inspectable by storing generated briefs and revisions as normal Hermeneia artifacts.
+
 ## MVP Storage
 
 Start with SQLite as the durable local database, while keeping exported run artifacts in folders:
