@@ -481,7 +481,11 @@ func (s Service) RenderRun(ctx context.Context, runID string) (RenderResult, err
 		}
 		artifactIDs = append(artifactIDs, artifactID)
 	}
-	artifacts, err := s.Repo.ListArtifactsByIDs(ctx, artifactIDs)
+	// Hydrate DB-generated metadata after writes even if the caller disconnects
+	// immediately after the render commits artifacts.
+	readbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	artifacts, err := s.Repo.ListArtifactsByIDs(readbackCtx, artifactIDs)
 	if err != nil {
 		return RenderResult{}, err
 	}
