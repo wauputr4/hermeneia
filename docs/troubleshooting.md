@@ -140,3 +140,15 @@ Notes:
 - The frontend defaults to `http://127.0.0.1:19317`; set `PUBLIC_HERMENEIA_API_BASE` if the API runs elsewhere.
 - Browser CORS behavior may matter once the dev server and API use different origins. Keep local API development on loopback and add explicit API CORS handling before exposing it outside local development.
 - Run `npm test` inside `apps/web` for view-model helper coverage. Full SvelteKit build validation requires installing frontend dependencies with `npm install`.
+
+## 2026-05-09 — Scheduling foundation
+
+`hermeneia schedule` creates local scheduling metadata only. It does not publish
+to Meta, YouTube, TikTok, LinkedIn, or other external platforms yet.
+
+Important guardrails:
+
+- SQLite stores schedule status, platform name, selected artifact id, and validation metadata.
+- SQLite must not store OAuth tokens, API keys, refresh tokens, or account credentials.
+- Supported MVP platform names are `instagram`, `facebook`, `youtube`, `tiktok`, and `linkedin`.
+- Use RFC3339 timestamps for `--at` and API `scheduled_at` values.

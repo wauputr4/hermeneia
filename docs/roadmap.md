@@ -108,6 +108,7 @@ Support scheduled publishing to social platforms.
 Deliverables:
 
 - Content calendar.
+- Schedule records in SQLite with post status tracking. (initial slice shipped)
 - Meta API integration.
 - YouTube integration.
-- Post status tracking.
+- Platform connectors that keep credentials out of SQLite.

@@ -79,12 +79,28 @@ func TestServiceCreateReviseAndRenderCarouselRun(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	scheduledAt := time.Date(2026, 5, 10, 2, 0, 0, 0, time.UTC)
+	scheduled, err := service.SchedulePost(ctx, ScheduleInput{
+		RunID:       created.Run.ID,
+		ArtifactID:  rendered.Artifacts[0].ID,
+		Platform:    "instagram",
+		ScheduledAt: scheduledAt,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scheduled.Post.Status != "scheduled" || scheduled.Post.Platform != "instagram" {
+		t.Fatalf("unexpected scheduled post: %#v", scheduled.Post)
+	}
+	if !strings.Contains(scheduled.Post.ValidationJSON, `"credentials_stored_in_db":false`) {
+		t.Fatalf("validation must not store credentials: %s", scheduled.Post.ValidationJSON)
+	}
 
 	details, err := service.ShowRun(ctx, created.Run.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(details.Briefs) != 2 || len(details.Revisions) != 1 || len(details.Artifacts) == 0 {
+	if len(details.Briefs) != 2 || len(details.Revisions) != 1 || len(details.Artifacts) == 0 || len(details.Schedules) != 1 {
 		t.Fatalf("unexpected run details: %#v", details)
 	}
 	history, err := os.ReadFile(filepath.Join(service.Files.RunDir(created.Run.ID), "history.md"))
@@ -93,6 +109,9 @@ func TestServiceCreateReviseAndRenderCarouselRun(t *testing.T) {
 	}
 	if !strings.Contains(string(history), "Make the hook sharper") {
 		t.Fatalf("history missing revision instruction:\n%s", history)
+	}
+	if !strings.Contains(string(history), "scheduled instagram post") {
+		t.Fatalf("history missing schedule entry:\n%s", history)
 	}
 }
 

@@ -128,11 +128,24 @@ type RenderResult struct {
 	Artifacts []storage.Artifact
 }
 
+type ScheduleInput struct {
+	RunID       string
+	ArtifactID  string
+	Platform    string
+	ScheduledAt time.Time
+}
+
+type ScheduleResult struct {
+	Run  storage.ContentRun
+	Post storage.ScheduledPost
+}
+
 type RunDetails struct {
 	Run       storage.ContentRun
 	Briefs    []storage.BriefVersion
 	Revisions []storage.RevisionEvent
 	Artifacts []storage.Artifact
+	Schedules []storage.ScheduledPost
 }
 
 type ResearchPlanner interface {
@@ -336,7 +349,11 @@ func (s Service) ShowRun(ctx context.Context, runID string) (RunDetails, error) 
 	if err != nil {
 		return RunDetails{}, err
 	}
-	return RunDetails{Run: run, Briefs: briefs, Revisions: revisions, Artifacts: artifacts}, nil
+	schedules, err := s.Repo.ListScheduledPostsByRun(ctx, runID)
+	if err != nil {
+		return RunDetails{}, err
+	}
+	return RunDetails{Run: run, Briefs: briefs, Revisions: revisions, Artifacts: artifacts, Schedules: schedules}, nil
 }
 
 func (s Service) ListBriefs(ctx context.Context, runID string) ([]storage.BriefVersion, error) {
@@ -524,6 +541,62 @@ func (s Service) RenderRun(ctx context.Context, runID string) (RenderResult, err
 	}
 
 	return RenderResult{Run: run, Brief: latest, Content: content, Artifacts: artifacts}, nil
+}
+
+func (s Service) SchedulePost(ctx context.Context, input ScheduleInput) (ScheduleResult, error) {
+	runID := strings.TrimSpace(input.RunID)
+	if runID == "" {
+		return ScheduleResult{}, invalidInput("run id is required")
+	}
+	platform := normalizePublishPlatform(input.Platform)
+	if platform == "" {
+		return ScheduleResult{}, invalidInput("platform is required")
+	}
+	if !supportedPublishPlatform(platform) {
+		return ScheduleResult{}, invalidInput(fmt.Sprintf("unsupported publishing platform %q", input.Platform))
+	}
+	if input.ScheduledAt.IsZero() {
+		return ScheduleResult{}, invalidInput("scheduled_at is required")
+	}
+	run, err := s.Repo.GetContentRun(ctx, runID)
+	if err != nil {
+		return ScheduleResult{}, err
+	}
+	artifactID := strings.TrimSpace(input.ArtifactID)
+	if artifactID != "" {
+		artifact, err := s.Repo.GetArtifact(ctx, artifactID)
+		if err != nil {
+			return ScheduleResult{}, err
+		}
+		if artifact.RunID != runID {
+			return ScheduleResult{}, invalidInput("artifact does not belong to run")
+		}
+	}
+	validation := publishValidationJSON(run, platform, artifactID)
+	post := storage.ScheduledPost{
+		ID:             s.newID("schedule", runID+"-"+platform),
+		RunID:          runID,
+		ArtifactID:     artifactID,
+		Platform:       platform,
+		ScheduledAt:    input.ScheduledAt.UTC(),
+		Status:         "scheduled",
+		ValidationJSON: validation,
+	}
+	if err := s.Repo.CreateScheduledPost(ctx, post); err != nil {
+		return ScheduleResult{}, err
+	}
+	stored, err := s.Repo.GetScheduledPost(ctx, post.ID)
+	if err != nil {
+		return ScheduleResult{}, err
+	}
+	if err := runfiles.AppendText(s.Files.HistoryPath(runID), fmt.Sprintf("- scheduled %s post for %s.\n", platform, stored.ScheduledAt.Format(time.RFC3339))); err != nil {
+		return ScheduleResult{}, err
+	}
+	return ScheduleResult{Run: run, Post: stored}, nil
+}
+
+func (s Service) ListScheduledPosts(ctx context.Context) ([]storage.ScheduledPost, error) {
+	return s.Repo.ListScheduledPosts(ctx)
 }
 
 func (s Service) researchPlanner(requested string) (ResearchPlanner, error) {
@@ -851,6 +924,40 @@ func rendererName(contentType string) string {
 	default:
 		return "carousel/go-png"
 	}
+}
+
+func normalizePublishPlatform(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func supportedPublishPlatform(platform string) bool {
+	switch platform {
+	case "instagram", "facebook", "youtube", "tiktok", "linkedin":
+		return true
+	default:
+		return false
+	}
+}
+
+func publishValidationJSON(run storage.ContentRun, platform, artifactID string) string {
+	payload := map[string]any{
+		"platform":                    platform,
+		"content_type":                run.ContentType,
+		"credential_storage":          "external_only",
+		"credentials_stored_in_db":    false,
+		"requires_platform_connector": true,
+	}
+	if artifactID == "" {
+		payload["artifact_selected"] = false
+		payload["warning"] = "No rendered artifact was selected for the scheduled post."
+	} else {
+		payload["artifact_selected"] = true
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return "{}"
+	}
+	return string(data)
 }
 
 func (s Service) newID(prefix, seed string) string {

@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/wauputr4/hermeneia/internal/render"
@@ -82,6 +83,13 @@ func TestServerContentRunWorkflow(t *testing.T) {
 	if renderResult.Artifacts[0].CreatedAt.IsZero() {
 		t.Fatalf("expected render artifact timestamp, got %s", renderResult.Artifacts[0].CreatedAt)
 	}
+	schedule := request(t, handler, http.MethodPost, "/v1/runs/"+created.Run.ID+"/schedule", `{"platform":"instagram","artifact_id":"`+renderResult.Artifacts[0].ID+`","scheduled_at":"2026-05-10T02:00:00Z"}`)
+	assertStatus(t, schedule, http.StatusCreated)
+	var scheduled schedulePostResponse
+	decodeResponse(t, schedule, &scheduled)
+	if scheduled.Post.Status != "scheduled" || !strings.Contains(string(scheduled.Post.Validation), `"credentials_stored_in_db":false`) {
+		t.Fatalf("unexpected schedule response: %#v", scheduled)
+	}
 
 	artifacts := request(t, handler, http.MethodGet, "/v1/runs/"+created.Run.ID+"/artifacts", "")
 	assertStatus(t, artifacts, http.StatusOK)
@@ -91,6 +99,15 @@ func TestServerContentRunWorkflow(t *testing.T) {
 	decodeResponse(t, artifacts, &artifactList)
 	if len(artifactList.Artifacts) != len(renderResult.Artifacts) {
 		t.Fatalf("artifact list mismatch: %#v", artifactList.Artifacts)
+	}
+	schedules := request(t, handler, http.MethodGet, "/v1/scheduled-posts", "")
+	assertStatus(t, schedules, http.StatusOK)
+	var scheduleList struct {
+		ScheduledPosts []scheduledPostResponse `json:"scheduled_posts"`
+	}
+	decodeResponse(t, schedules, &scheduleList)
+	if len(scheduleList.ScheduledPosts) != 1 || scheduleList.ScheduledPosts[0].ID != scheduled.Post.ID {
+		t.Fatalf("schedule list mismatch: %#v", scheduleList.ScheduledPosts)
 	}
 
 	deleted := request(t, handler, http.MethodDelete, "/v1/runs/"+created.Run.ID, "")
