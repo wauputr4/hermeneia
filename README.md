@@ -113,19 +113,18 @@ By default, `hermeneia init` creates or migrates `data/hermeneia.db`. To use an 
 HERMENEIA_DATABASE_PATH=/tmp/hermeneia.db go run ./cmd/hermeneia init
 ```
 
-The current MVP does not require an LLM API key. Custom instructions are supported through deterministic revision commands:
+The current MVP does not require an OpenAI API key. Custom instructions are supported through deterministic revision commands:
 
 ```bash
 go run ./cmd/hermeneia revise <run-id> --instruction "Make the hook sharper"
 ```
 
-Future AI-assisted commands should use the optional variables declared in `.env.example`:
+Future AI-assisted commands should use the optional OpenAI variables declared in `.env.example`:
 
 ```text
-HERMENEIA_LLM_PROVIDER
-HERMENEIA_LLM_API_KEY
-HERMENEIA_LLM_BASE_URL
-HERMENEIA_LLM_MODEL
+OPENAI_API_KEY
+OPENAI_BASE_URL
+OPENAI_MODEL
 ```
 
 Current CLI surface:
@@ -134,7 +133,7 @@ Current CLI surface:
 - `hermeneia create` creates a run, writes `brief.v1.json`, and stores SQLite metadata.
 - `hermeneia list` lists stored runs.
 - `hermeneia show` displays run, version, revision, and artifact counts.
-- `hermeneia revise` creates the next brief version and records a revision event. In the MVP it applies a deterministic revision note instead of calling an LLM.
+- `hermeneia revise` creates the next brief version and records a revision event. In the MVP it applies a deterministic revision note instead of calling OpenAI.
 - `hermeneia render` writes `content.json`, generates output assets, and stores artifact references.
 
 Default MVP templates:

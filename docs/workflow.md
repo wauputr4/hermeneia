@@ -120,18 +120,17 @@ Custom instructions enter the MVP workflow through revision commands:
 hermeneia revise <run-id> --instruction "Make the hook sharper and more practical"
 ```
 
-In the current CLI MVP, this instruction is recorded deterministically in SQLite and `history.md`, reflected into the next brief version, and never sent to an LLM. Future AI-assisted revision can replace that deterministic placeholder while keeping the same append-only version contract.
+In the current CLI MVP, this instruction is recorded deterministically in SQLite and `history.md`, reflected into the next brief version, and never sent to OpenAI. Future AI-assisted revision can replace that deterministic placeholder while keeping the same append-only version contract.
 
-Optional future LLM configuration:
+Optional future OpenAI configuration:
 
 ```text
-HERMENEIA_LLM_PROVIDER
-HERMENEIA_LLM_API_KEY
-HERMENEIA_LLM_BASE_URL
-HERMENEIA_LLM_MODEL
+OPENAI_API_KEY
+OPENAI_BASE_URL
+OPENAI_MODEL
 ```
 
-These variables are intentionally optional for the MVP. They should be required only when commands actually call an external model provider for research, brief generation, or AI-assisted revision.
+These variables are intentionally optional for the MVP. They should be required only when commands actually call OpenAI for research, brief generation, or AI-assisted revision.
 
 ## File Artifact Convention
 
