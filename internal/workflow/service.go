@@ -449,6 +449,10 @@ func (s Service) RenderRun(ctx context.Context, runID string) (RenderResult, err
 
 	contentPath := s.Files.ContentPath(runID)
 	files = append([]render.OutputFile{{Kind: "content_json", Path: contentPath}}, files...)
+	// Once renderer files exist, finish metadata writes even if the caller
+	// disconnects so disk artifacts and SQLite rows do not drift apart.
+	metadataCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	defer cancel()
 	completedAt := s.now()
 	job := storage.RenderJob{
 		ID:          s.newID("render", runID),
@@ -457,7 +461,7 @@ func (s Service) RenderRun(ctx context.Context, runID string) (RenderResult, err
 		Renderer:    rendererName(run.ContentType),
 		CompletedAt: &completedAt,
 	}
-	if err := s.Repo.CreateRenderJob(ctx, job); err != nil {
+	if err := s.Repo.CreateRenderJob(metadataCtx, job); err != nil {
 		return RenderResult{}, err
 	}
 
@@ -476,16 +480,12 @@ func (s Service) RenderRun(ctx context.Context, runID string) (RenderResult, err
 			Path:           filepath.Clean(file.Path),
 			Checksum:       checksum,
 		}
-		if err := s.Repo.CreateArtifact(ctx, artifact); err != nil {
+		if err := s.Repo.CreateArtifact(metadataCtx, artifact); err != nil {
 			return RenderResult{}, err
 		}
 		artifactIDs = append(artifactIDs, artifactID)
 	}
-	// Hydrate DB-generated metadata after writes even if the caller disconnects
-	// immediately after the render commits artifacts.
-	readbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-	defer cancel()
-	artifacts, err := s.Repo.ListArtifactsByIDs(readbackCtx, artifactIDs)
+	artifacts, err := s.Repo.ListArtifactsByIDs(metadataCtx, artifactIDs)
 	if err != nil {
 		return RenderResult{}, err
 	}
