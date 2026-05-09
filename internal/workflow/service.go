@@ -525,9 +525,6 @@ func (s Service) RenderRun(ctx context.Context, runID string) (RenderResult, err
 func (s Service) researchPlanner(requested string) (ResearchPlanner, error) {
 	switch strings.ToLower(strings.TrimSpace(requested)) {
 	case "", "auto":
-		if s.Planner != nil {
-			return s.Planner, nil
-		}
 		return DeterministicResearchPlanner{}, nil
 	case "deterministic":
 		return DeterministicResearchPlanner{}, nil

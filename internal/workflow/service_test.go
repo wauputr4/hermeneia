@@ -153,6 +153,51 @@ func TestServiceCreateRunFromResearchStoresTraceablePlan(t *testing.T) {
 	}
 }
 
+func TestServiceCreateRunFromResearchDefaultsToDeterministicPlanner(t *testing.T) {
+	ctx := context.Background()
+	db, err := storage.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := storage.Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+
+	service := NewService(storage.NewRepository(db), runfiles.New(t.TempDir()))
+	service.Planner = OpenAIResearchPlanner{APIKey: "test-key", Model: "test-model", BaseURL: "http://127.0.0.1:1"}
+	service.NewID = func(prefix, seed string) string {
+		switch prefix {
+		case "run":
+			return "run-default-deterministic-research"
+		case "artifact":
+			return "artifact-default-deterministic-research-json"
+		default:
+			return prefix + "-test"
+		}
+	}
+
+	result, err := service.CreateRunFromResearch(ctx, ResearchInput{
+		Topic:       "AI agents in marketing",
+		ContentType: "carousel",
+		Sources:     []ResearchSource{{URL: "https://example.com/agents"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(result.ResearchPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var plan ResearchPlan
+	if err := json.Unmarshal(data, &plan); err != nil {
+		t.Fatal(err)
+	}
+	if plan.Planner != "deterministic" {
+		t.Fatalf("expected deterministic planner by default, got %q", plan.Planner)
+	}
+}
+
 func TestServiceCreateRunFromResearchUsesOpenAIPlanner(t *testing.T) {
 	ctx := context.Background()
 	db, err := storage.Open(":memory:")

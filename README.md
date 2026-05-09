@@ -115,7 +115,7 @@ By default, `hermeneia init` creates or migrates `data/hermeneia.db`. To use an 
 HERMENEIA_DATABASE_PATH=/tmp/hermeneia.db go run ./cmd/hermeneia init
 ```
 
-The current MVP does not require an OpenAI API key; custom instructions are supported through the deterministic `revise` command listed above. Research runs default to a deterministic local planner unless OpenAI configuration is present or `--planner openai` is requested.
+The current MVP does not require an OpenAI API key; custom instructions are supported through the deterministic `revise` command listed above. Research runs default to a deterministic local planner unless `--planner openai` is requested explicitly.
 
 Future AI-assisted commands should use the optional OpenAI variables declared in `.env.example`:
 

@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/wauputr4/hermeneia/internal/workflow"
 )
 
 func TestHelpOutputIncludesMVPCommandSurface(t *testing.T) {
@@ -146,6 +148,20 @@ func TestCLIResearchOpenAIPlannerRequiresConfig(t *testing.T) {
 	}
 	if got := err.Error(); !strings.Contains(got, "OPENAI_API_KEY") || !strings.Contains(got, "OPENAI_MODEL") {
 		t.Fatalf("unexpected error: %q", got)
+	}
+}
+
+func TestResearchPlannerFromEnvConfiguresReusableHTTPClient(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "test-key")
+	t.Setenv("OPENAI_MODEL", "test-model")
+	t.Setenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+
+	planner, ok := researchPlannerFromEnv().(workflow.OpenAIResearchPlanner)
+	if !ok {
+		t.Fatalf("expected OpenAI planner, got %T", researchPlannerFromEnv())
+	}
+	if planner.HTTPClient == nil {
+		t.Fatal("expected reusable HTTP client")
 	}
 }
 

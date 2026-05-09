@@ -430,9 +430,10 @@ func researchPlannerFromEnv() workflow.ResearchPlanner {
 		return workflow.DeterministicResearchPlanner{}
 	}
 	return workflow.OpenAIResearchPlanner{
-		APIKey:  os.Getenv("OPENAI_API_KEY"),
-		BaseURL: os.Getenv("OPENAI_BASE_URL"),
-		Model:   os.Getenv("OPENAI_MODEL"),
+		APIKey:     os.Getenv("OPENAI_API_KEY"),
+		BaseURL:    os.Getenv("OPENAI_BASE_URL"),
+		Model:      os.Getenv("OPENAI_MODEL"),
+		HTTPClient: &http.Client{Timeout: 45 * time.Second},
 	}
 }
 
