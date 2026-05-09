@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -221,6 +222,51 @@ func (r *Repository) GetArtifact(ctx context.Context, id string) (Artifact, erro
 		a.Checksum = checksum.String
 	}
 	return a, err
+}
+func (r *Repository) ListArtifactsByIDs(ctx context.Context, ids []string) ([]Artifact, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	placeholders := make([]string, len(ids))
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	rows, err := r.db.QueryContext(ctx, `SELECT id, run_id, brief_version_id, kind, path, checksum, created_at FROM artifacts WHERE id IN (`+strings.Join(placeholders, ",")+`)`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	byID := make(map[string]Artifact, len(ids))
+	for rows.Next() {
+		var a Artifact
+		var bvid, checksum sql.NullString
+		if err := rows.Scan(&a.ID, &a.RunID, &bvid, &a.Kind, &a.Path, &checksum, &a.CreatedAt); err != nil {
+			return nil, err
+		}
+		if bvid.Valid {
+			a.BriefVersionID = bvid.String
+		}
+		if checksum.Valid {
+			a.Checksum = checksum.String
+		}
+		byID[a.ID] = a
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	artifacts := make([]Artifact, 0, len(ids))
+	for _, id := range ids {
+		artifact, ok := byID[id]
+		if !ok {
+			return nil, sql.ErrNoRows
+		}
+		artifacts = append(artifacts, artifact)
+	}
+	return artifacts, nil
 }
 func (r *Repository) ListArtifactsByRun(ctx context.Context, runID string) ([]Artifact, error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT id, run_id, brief_version_id, kind, path, checksum, created_at FROM artifacts WHERE run_id = ? ORDER BY created_at ASC, id ASC`, runID)

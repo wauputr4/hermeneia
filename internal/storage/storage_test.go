@@ -40,6 +40,9 @@ func TestMigrateAndRepositoryCreateRead(t *testing.T) {
 	if err := repo.CreateArtifact(ctx, Artifact{ID: "artifact-1", RunID: "run-1", BriefVersionID: "brief-1", Kind: "carousel_png", Path: "runs/run-1/output/slide-1.png"}); err != nil {
 		t.Fatal(err)
 	}
+	if err := repo.CreateArtifact(ctx, Artifact{ID: "artifact-2", RunID: "run-1", BriefVersionID: "brief-2", Kind: "caption_txt", Path: "runs/run-1/output/caption.txt"}); err != nil {
+		t.Fatal(err)
+	}
 	run, err := repo.GetContentRun(ctx, "run-1")
 	if err != nil {
 		t.Fatal(err)
@@ -74,6 +77,16 @@ func TestMigrateAndRepositoryCreateRead(t *testing.T) {
 	}
 	if artifact.Path != "runs/run-1/output/slide-1.png" {
 		t.Fatalf("unexpected artifact: %#v", artifact)
+	}
+	artifacts, err := repo.ListArtifactsByIDs(ctx, []string{"artifact-2", "artifact-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(artifacts) != 2 || artifacts[0].ID != "artifact-2" || artifacts[1].ID != "artifact-1" {
+		t.Fatalf("expected artifacts in requested order, got %#v", artifacts)
+	}
+	if artifacts[0].CreatedAt.IsZero() || artifacts[1].CreatedAt.IsZero() {
+		t.Fatalf("expected database timestamps in artifacts: %#v", artifacts)
 	}
 	if _, err := repo.GetContentRun(ctx, "missing"); err != sql.ErrNoRows {
 		t.Fatalf("expected sql.ErrNoRows, got %v", err)

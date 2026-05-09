@@ -179,8 +179,16 @@ func (s Service) createRunWithBrief(ctx context.Context, input CreateInput, cont
 		return fail(err)
 	}
 	runCreated = true
+	storedRun, err := s.Repo.GetContentRun(ctx, runID)
+	if err != nil {
+		return fail(err)
+	}
 	version := storage.BriefVersion{ID: briefID(runID, 1), RunID: runID, Version: 1, BodyJSON: body}
 	if err := s.Repo.CreateBriefVersion(ctx, version); err != nil {
+		return fail(err)
+	}
+	storedVersion, err := s.Repo.GetBriefVersion(ctx, version.ID)
+	if err != nil {
 		return fail(err)
 	}
 
@@ -192,7 +200,7 @@ func (s Service) createRunWithBrief(ctx context.Context, input CreateInput, cont
 	if err := runfiles.WriteText(historyPath, "# Hermeneia Run History\n\n"+historyEntry); err != nil {
 		return fail(err)
 	}
-	return CreateResult{Run: run, Brief: version, BriefPath: briefPath, HistoryPath: historyPath}, nil
+	return CreateResult{Run: storedRun, Brief: storedVersion, BriefPath: briefPath, HistoryPath: historyPath}, nil
 }
 
 func (s Service) cleanupCreatedRun(ctx context.Context, runID string) {
@@ -263,10 +271,14 @@ func (s Service) CreateRunFromResearch(ctx context.Context, input ResearchInput)
 	if err := s.Repo.CreateArtifact(ctx, artifact); err != nil {
 		return fail(err)
 	}
+	storedArtifact, err := s.Repo.GetArtifact(ctx, artifact.ID)
+	if err != nil {
+		return fail(err)
+	}
 	if err := runfiles.AppendText(created.HistoryPath, fmt.Sprintf("- research plan stored from %d source URLs.\n", len(sources))); err != nil {
 		return fail(err)
 	}
-	return ResearchResult{CreateResult: created, ResearchPath: researchPath, ResearchArtifact: artifact}, nil
+	return ResearchResult{CreateResult: created, ResearchPath: researchPath, ResearchArtifact: storedArtifact}, nil
 }
 
 func (s Service) ListRuns(ctx context.Context) ([]storage.ContentRun, error) {
@@ -367,6 +379,10 @@ func (s Service) ReviseRun(ctx context.Context, runID, instruction string) (Revi
 	if err := s.Repo.CreateBriefVersion(ctx, next); err != nil {
 		return ReviseResult{}, err
 	}
+	storedNext, err := s.Repo.GetBriefVersion(ctx, next.ID)
+	if err != nil {
+		return ReviseResult{}, err
+	}
 	event := storage.RevisionEvent{
 		ID:                 revisionID(runID, nextVersion),
 		RunID:              runID,
@@ -386,7 +402,7 @@ func (s Service) ReviseRun(ctx context.Context, runID, instruction string) (Revi
 	if err := runfiles.AppendText(s.Files.HistoryPath(runID), historyEntry); err != nil {
 		return ReviseResult{}, err
 	}
-	return ReviseResult{Run: run, Previous: previous, Brief: next, BriefPath: briefPath}, nil
+	return ReviseResult{Run: run, Previous: previous, Brief: storedNext, BriefPath: briefPath}, nil
 }
 
 func (s Service) RenderRun(ctx context.Context, runID string) (RenderResult, error) {
@@ -445,14 +461,15 @@ func (s Service) RenderRun(ctx context.Context, runID string) (RenderResult, err
 		return RenderResult{}, err
 	}
 
-	artifacts := make([]storage.Artifact, 0, len(files))
+	artifactIDs := make([]string, 0, len(files))
 	for i, file := range files {
 		checksum, err := runfiles.Checksum(file.Path)
 		if err != nil {
 			return RenderResult{}, err
 		}
+		artifactID := s.newID("artifact", fmt.Sprintf("%s-%d", file.Kind, i+1))
 		artifact := storage.Artifact{
-			ID:             s.newID("artifact", fmt.Sprintf("%s-%d", file.Kind, i+1)),
+			ID:             artifactID,
 			RunID:          runID,
 			BriefVersionID: latest.ID,
 			Kind:           file.Kind,
@@ -462,7 +479,11 @@ func (s Service) RenderRun(ctx context.Context, runID string) (RenderResult, err
 		if err := s.Repo.CreateArtifact(ctx, artifact); err != nil {
 			return RenderResult{}, err
 		}
-		artifacts = append(artifacts, artifact)
+		artifactIDs = append(artifactIDs, artifactID)
+	}
+	artifacts, err := s.Repo.ListArtifactsByIDs(ctx, artifactIDs)
+	if err != nil {
+		return RenderResult{}, err
 	}
 	if err := runfiles.AppendText(s.Files.HistoryPath(runID), fmt.Sprintf("- rendered %s artifacts from brief v%d.\n", run.ContentType, latest.Version)); err != nil {
 		return RenderResult{}, err

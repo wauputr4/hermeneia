@@ -91,12 +91,13 @@ If video rendering fails with an `ffmpeg is required` message, install `ffmpeg` 
 
 ## 2026-05-09 — HTTP API MVP slice
 
-The local HTTP API is exposed through `hermeneia serve --addr 127.0.0.1:8080`.
+The local HTTP API is exposed through `hermeneia serve --addr 127.0.0.1:19317`.
 
 Notes:
 
 - API handlers live under `internal/httpapi`.
 - Handlers call the same `workflow.Service` methods as the CLI.
 - Route docs live in `docs/api.md`.
+- API responses should use rows loaded back from SQLite when they expose database-owned timestamps. Batch-load newly inserted render artifacts so timestamp hydration does not add one read query per generated file.
 - The API is intentionally local-first; authentication and multi-user concerns
   are deferred until hosted collaboration becomes part of the product scope.
