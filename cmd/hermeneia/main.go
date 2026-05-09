@@ -66,6 +66,8 @@ func (c command) run(ctx context.Context, args []string) error {
 		return nil
 	case "create":
 		return c.create(ctx, args[1:])
+	case "research":
+		return c.research(ctx, args[1:])
 	case "list":
 		return c.list(ctx, args[1:])
 	case "show":
@@ -100,6 +102,21 @@ func (c command) create(ctx context.Context, args []string) error {
 			return err
 		}
 		fmt.Fprintf(c.stdout, "created run %s\nbrief %s\n", result.Run.ID, result.BriefPath)
+		return nil
+	})
+}
+
+func (c command) research(ctx context.Context, args []string) error {
+	input, err := parseResearchArgs(args)
+	if err != nil {
+		return err
+	}
+	return c.withService(ctx, func(s workflow.Service) error {
+		result, err := s.CreateRunFromResearch(ctx, input)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(c.stdout, "created research run %s\nresearch %s\nbrief %s\n", result.Run.ID, result.ResearchPath, result.BriefPath)
 		return nil
 	})
 }
@@ -278,12 +295,109 @@ func parseReviseArgs(args []string) (string, string, error) {
 	return runID, instruction, nil
 }
 
+func parseResearchArgs(args []string) (workflow.ResearchInput, error) {
+	var input workflow.ResearchInput
+	var topicParts []string
+	topicSetExplicitly := false
+	input.ContentType = "carousel"
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if value, ok := strings.CutPrefix(arg, "--topic="); ok {
+			input.Topic = value
+			topicSetExplicitly = true
+			continue
+		}
+		if value, ok := strings.CutPrefix(arg, "--type="); ok {
+			input.ContentType = value
+			continue
+		}
+		if value, ok := strings.CutPrefix(arg, "--template="); ok {
+			input.TemplateID = value
+			continue
+		}
+		if value, ok := strings.CutPrefix(arg, "--tone="); ok {
+			input.Tone = value
+			continue
+		}
+		if value, ok := strings.CutPrefix(arg, "--platform="); ok {
+			input.Platform = value
+			continue
+		}
+		if value, ok := strings.CutPrefix(arg, "--audience="); ok {
+			input.TargetAudience = value
+			continue
+		}
+		if value, ok := strings.CutPrefix(arg, "--source="); ok {
+			input.Sources = append(input.Sources, workflow.ResearchSource{URL: value})
+			continue
+		}
+		switch arg {
+		case "--topic":
+			i++
+			if i >= len(args) {
+				return input, errors.New("--topic requires a value")
+			}
+			input.Topic = args[i]
+			topicSetExplicitly = true
+		case "--type":
+			i++
+			if i >= len(args) {
+				return input, errors.New("--type requires a value")
+			}
+			input.ContentType = args[i]
+		case "--template":
+			i++
+			if i >= len(args) {
+				return input, errors.New("--template requires a value")
+			}
+			input.TemplateID = args[i]
+		case "--tone":
+			i++
+			if i >= len(args) {
+				return input, errors.New("--tone requires a value")
+			}
+			input.Tone = args[i]
+		case "--platform":
+			i++
+			if i >= len(args) {
+				return input, errors.New("--platform requires a value")
+			}
+			input.Platform = args[i]
+		case "--audience":
+			i++
+			if i >= len(args) {
+				return input, errors.New("--audience requires a value")
+			}
+			input.TargetAudience = args[i]
+		case "--source":
+			i++
+			if i >= len(args) {
+				return input, errors.New("--source requires a value")
+			}
+			input.Sources = append(input.Sources, workflow.ResearchSource{URL: args[i]})
+		default:
+			if strings.HasPrefix(arg, "-") {
+				return input, fmt.Errorf("unknown flag %q", arg)
+			}
+			topicParts = append(topicParts, arg)
+		}
+	}
+	if topicSetExplicitly && len(topicParts) > 0 {
+		return input, fmt.Errorf("unexpected positional argument %q when --topic is set", strings.Join(topicParts, " "))
+	}
+	if input.Topic == "" && len(topicParts) > 0 {
+		input.Topic = strings.Join(topicParts, " ")
+	}
+	return input, nil
+}
+
 func (c command) printUsage() {
 	fmt.Fprintln(c.stdout, `Hermeneia content workflow CLI
 
 Usage:
   hermeneia init              initialize the SQLite database
   hermeneia create            create a content run
+  hermeneia research          create a run from traceable research sources
   hermeneia list              list content runs
   hermeneia show              show a content run
   hermeneia revise            create a new brief revision
@@ -298,6 +412,7 @@ Configuration:
 
 Examples:
   hermeneia create --topic "AI agents in marketing" --type carousel
+  hermeneia research --topic "AI agents" --source "https://example.com/news"
   hermeneia revise <run-id> --instruction "Make the hook sharper"
   hermeneia render <run-id>`)
 }

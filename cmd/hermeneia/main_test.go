@@ -21,6 +21,7 @@ func TestHelpOutputIncludesMVPCommandSurface(t *testing.T) {
 	for _, want := range []string{
 		"hermeneia init",
 		"hermeneia create",
+		"hermeneia research",
 		"hermeneia list",
 		"hermeneia show",
 		"hermeneia revise",
@@ -68,6 +69,57 @@ func TestInitRejectsUnexpectedArguments(t *testing.T) {
 		t.Fatal("expected error")
 	}
 	if got := err.Error(); !strings.Contains(got, "does not accept arguments") {
+		t.Fatalf("unexpected error: %q", got)
+	}
+}
+
+func TestCLIResearchCreatesTraceableRun(t *testing.T) {
+	ctx := context.Background()
+	var stdout bytes.Buffer
+	dbPath := filepath.Join(t.TempDir(), "hermeneia.db")
+	runsRoot := filepath.Join(t.TempDir(), "runs")
+	t.Setenv("HERMENEIA_DATABASE_PATH", dbPath)
+
+	cmd := command{
+		stdout:   &stdout,
+		runsRoot: runsRoot,
+		newID: func(prefix, seed string) string {
+			if prefix == "run" {
+				return "run-research"
+			}
+			return prefix + "-research"
+		},
+	}
+	err := cmd.run(ctx, []string{
+		"research",
+		"AI agents in marketing",
+		"--source", "https://example.com/agents",
+		"--source", "https://example.com/marketing",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "created research run run-research") {
+		t.Fatalf("unexpected research output:\n%s", stdout.String())
+	}
+	if _, err := os.Stat(filepath.Join(runsRoot, "run-research", "research.json")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCLIResearchRejectsStrayArgsWhenTopicIsSet(t *testing.T) {
+	cmd := command{stdout: &bytes.Buffer{}}
+
+	err := cmd.run(context.Background(), []string{
+		"research",
+		"--topic", "AI agents",
+		"--source", "https://example.com/agents",
+		"https://example.com/marketing",
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if got := err.Error(); !strings.Contains(got, "unexpected positional argument") {
 		t.Fatalf("unexpected error: %q", got)
 	}
 }

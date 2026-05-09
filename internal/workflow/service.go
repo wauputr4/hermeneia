@@ -48,11 +48,48 @@ type CreateInput struct {
 	TargetAudience string
 }
 
+type ResearchInput struct {
+	Topic          string
+	ContentType    string
+	TemplateID     string
+	Platform       string
+	Tone           string
+	TargetAudience string
+	Sources        []ResearchSource
+}
+
+type ResearchSource struct {
+	URL   string `json:"url"`
+	Note  string `json:"note,omitempty"`
+	Title string `json:"title,omitempty"`
+}
+
+type ResearchPlan struct {
+	Topic       string           `json:"topic"`
+	Sources     []ResearchSource `json:"sources"`
+	Summary     string           `json:"summary"`
+	Ideas       []ResearchIdea   `json:"ideas"`
+	ContentType string           `json:"content_type"`
+	TemplateID  string           `json:"template_id"`
+}
+
+type ResearchIdea struct {
+	Title  string `json:"title"`
+	Reason string `json:"reason"`
+	Rank   int    `json:"rank"`
+}
+
 type CreateResult struct {
 	Run         storage.ContentRun
 	Brief       storage.BriefVersion
 	BriefPath   string
 	HistoryPath string
+}
+
+type ResearchResult struct {
+	CreateResult
+	ResearchPath     string
+	ResearchArtifact storage.Artifact
 }
 
 type ReviseResult struct {
@@ -98,38 +135,122 @@ func (s Service) CreateRun(ctx context.Context, input CreateInput) (CreateResult
 		templateID = defaultTemplate(contentType)
 	}
 
+	b := draftBrief(input, contentType, templateID)
+	return s.createRunWithBrief(ctx, input, contentType, templateID, b, fmt.Sprintf("- v1 created from topic %q.\n", b.Topic))
+}
+
+func (s Service) createRunWithBrief(ctx context.Context, input CreateInput, contentType, templateID string, b brief.Brief, historyEntry string) (CreateResult, error) {
 	runID := s.newID("run", input.Topic)
 	if err := s.Files.PrepareRun(runID); err != nil {
 		return CreateResult{}, err
 	}
+	runCreated := false
+	fail := func(err error) (CreateResult, error) {
+		s.cleanupPreparedRun(ctx, runID, runCreated)
+		return CreateResult{}, err
+	}
 
-	b := draftBrief(input, contentType, templateID)
 	body, err := marshalBrief(b)
 	if err != nil {
-		return CreateResult{}, err
+		return fail(err)
 	}
 
 	if err := s.Repo.EnsureTemplate(ctx, storage.Template{ID: templateID, Name: templateName(templateID), ContentType: contentType}); err != nil {
-		return CreateResult{}, err
+		return fail(err)
 	}
 	run := storage.ContentRun{ID: runID, Topic: b.Topic, ContentType: contentType, TemplateID: templateID}
 	if err := s.Repo.CreateContentRun(ctx, run); err != nil {
-		return CreateResult{}, err
+		return fail(err)
 	}
+	runCreated = true
 	version := storage.BriefVersion{ID: briefID(runID, 1), RunID: runID, Version: 1, BodyJSON: body}
 	if err := s.Repo.CreateBriefVersion(ctx, version); err != nil {
-		return CreateResult{}, err
+		return fail(err)
 	}
 
 	briefPath := s.Files.BriefPath(runID, 1)
 	if err := runfiles.WriteJSON(briefPath, b); err != nil {
-		return CreateResult{}, err
+		return fail(err)
 	}
 	historyPath := s.Files.HistoryPath(runID)
-	if err := runfiles.WriteText(historyPath, fmt.Sprintf("# Hermeneia Run History\n\n- v1 created from topic %q.\n", b.Topic)); err != nil {
-		return CreateResult{}, err
+	if err := runfiles.WriteText(historyPath, "# Hermeneia Run History\n\n"+historyEntry); err != nil {
+		return fail(err)
 	}
 	return CreateResult{Run: run, Brief: version, BriefPath: briefPath, HistoryPath: historyPath}, nil
+}
+
+func (s Service) cleanupCreatedRun(ctx context.Context, runID string) {
+	s.cleanupPreparedRun(ctx, runID, true)
+}
+
+func (s Service) cleanupPreparedRun(ctx context.Context, runID string, deleteDB bool) {
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	if deleteDB {
+		_ = s.Repo.DeleteContentRun(cleanupCtx, runID)
+	}
+	_ = s.Files.RemoveRun(runID)
+}
+
+func (s Service) CreateRunFromResearch(ctx context.Context, input ResearchInput) (ResearchResult, error) {
+	contentType, err := normalizeContentType(input.ContentType)
+	if err != nil {
+		return ResearchResult{}, err
+	}
+	if strings.TrimSpace(input.Topic) == "" {
+		return ResearchResult{}, errors.New("topic is required")
+	}
+	sources := normalizeResearchSources(input.Sources)
+	if len(sources) == 0 {
+		return ResearchResult{}, errors.New("at least one source URL is required")
+	}
+	templateID := strings.TrimSpace(input.TemplateID)
+	if templateID == "" {
+		templateID = defaultTemplate(contentType)
+	}
+
+	createInput := CreateInput{
+		Topic:          input.Topic,
+		ContentType:    contentType,
+		TemplateID:     templateID,
+		Tone:           input.Tone,
+		Platform:       input.Platform,
+		TargetAudience: input.TargetAudience,
+	}
+	plan := draftResearchPlan(input.Topic, contentType, templateID, sources)
+	initialBrief := draftBriefFromResearch(createInput, plan)
+	created, err := s.createRunWithBrief(ctx, createInput, contentType, templateID, initialBrief, fmt.Sprintf("- v1 created from research topic %q.\n", strings.TrimSpace(input.Topic)))
+	if err != nil {
+		return ResearchResult{}, err
+	}
+	fail := func(err error) (ResearchResult, error) {
+		s.cleanupCreatedRun(ctx, created.Run.ID)
+		return ResearchResult{}, err
+	}
+
+	researchPath := s.Files.ResearchPath(created.Run.ID)
+	if err := runfiles.WriteJSON(researchPath, plan); err != nil {
+		return fail(err)
+	}
+	checksum, err := runfiles.Checksum(researchPath)
+	if err != nil {
+		return fail(err)
+	}
+	artifact := storage.Artifact{
+		ID:             s.newID("artifact", "research-json"),
+		RunID:          created.Run.ID,
+		BriefVersionID: created.Brief.ID,
+		Kind:           "research_json",
+		Path:           filepath.Clean(researchPath),
+		Checksum:       checksum,
+	}
+	if err := s.Repo.CreateArtifact(ctx, artifact); err != nil {
+		return fail(err)
+	}
+	if err := runfiles.AppendText(created.HistoryPath, fmt.Sprintf("- research plan stored from %d source URLs.\n", len(sources))); err != nil {
+		return fail(err)
+	}
+	return ResearchResult{CreateResult: created, ResearchPath: researchPath, ResearchArtifact: artifact}, nil
 }
 
 func (s Service) ListRuns(ctx context.Context) ([]storage.ContentRun, error) {
@@ -326,6 +447,57 @@ func draftBrief(input CreateInput, contentType, templateID string) brief.Brief {
 		CaptionDraft:    "A structured first draft about " + topic + ", ready for review and revision.",
 		Hashtags:        []string{"#Hermeneia", "#ContentWorkflow", "#AI"},
 	}
+}
+
+func draftBriefFromResearch(input CreateInput, plan ResearchPlan) brief.Brief {
+	b := draftBrief(input, plan.ContentType, plan.TemplateID)
+	b.Angle = "A source-backed editorial take on " + plan.Topic
+	b.Hook = "The signal behind " + plan.Topic
+	b.KeyPoints = make([]string, 0, len(plan.Ideas)+1)
+	b.KeyPoints = append(b.KeyPoints, plan.Summary)
+	for _, idea := range plan.Ideas {
+		b.KeyPoints = append(b.KeyPoints, idea.Title+": "+idea.Reason)
+	}
+	b.VisualDirection = "Source-backed editorial layout with clear citations, readable hierarchy, and traceable claims"
+	b.CaptionDraft = "Research-backed brief about " + plan.Topic + ". Review the source URLs in research.json before rendering."
+	return b
+}
+
+func draftResearchPlan(topic, contentType, templateID string, sources []ResearchSource) ResearchPlan {
+	ideas := make([]ResearchIdea, 0, len(sources))
+	for i, source := range sources {
+		label := source.Title
+		if label == "" {
+			label = source.URL
+		}
+		reason := source.Note
+		if reason == "" {
+			reason = "Source preserved for editorial review and traceability."
+		}
+		ideas = append(ideas, ResearchIdea{Title: label, Reason: reason, Rank: i + 1})
+	}
+	return ResearchPlan{
+		Topic:       strings.TrimSpace(topic),
+		Sources:     sources,
+		Summary:     fmt.Sprintf("Research seed for %q using %d traceable source URLs.", strings.TrimSpace(topic), len(sources)),
+		Ideas:       ideas,
+		ContentType: contentType,
+		TemplateID:  templateID,
+	}
+}
+
+func normalizeResearchSources(sources []ResearchSource) []ResearchSource {
+	out := make([]ResearchSource, 0, len(sources))
+	for _, source := range sources {
+		source.URL = strings.TrimSpace(source.URL)
+		source.Note = strings.TrimSpace(source.Note)
+		source.Title = strings.TrimSpace(source.Title)
+		if source.URL == "" {
+			continue
+		}
+		out = append(out, source)
+	}
+	return out
 }
 
 func marshalBrief(b brief.Brief) (string, error) {

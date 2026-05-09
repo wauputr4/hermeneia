@@ -141,6 +141,10 @@ func (r *Repository) CreateContentRun(ctx context.Context, cr ContentRun) error 
 	_, err := r.db.ExecContext(ctx, `INSERT INTO content_runs (id, topic, content_type, template_id) VALUES (?, ?, ?, ?)`, cr.ID, cr.Topic, cr.ContentType, nullIfEmpty(cr.TemplateID))
 	return err
 }
+func (r *Repository) DeleteContentRun(ctx context.Context, id string) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM content_runs WHERE id = ?`, id)
+	return err
+}
 func (r *Repository) GetContentRun(ctx context.Context, id string) (ContentRun, error) {
 	var cr ContentRun
 	var template sql.NullString

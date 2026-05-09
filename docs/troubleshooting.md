@@ -79,6 +79,7 @@ The MVP CLI now supports `create`, `list`, `show`, `revise`, and `render`.
 Notes:
 
 - `create` writes `brief.v1.json`, creates the deterministic run folder, and stores run metadata in SQLite.
+- `research` writes `research.json`, preserves supplied source URLs, records a `research_json` artifact row, and creates a schema-valid brief draft from the research plan.
 - `revise` appends a new `brief.v{n}.json` and records a revision event without overwriting older brief files.
 - MVP revision behavior is deterministic: the CLI records the human instruction, appends a visible revision note, and preserves version history. It is not yet an LLM rewrite pipeline.
 - `render` writes `content.json`, renderer outputs, artifact rows, and checksums.

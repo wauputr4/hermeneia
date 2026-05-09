@@ -24,9 +24,18 @@ func New(root string) Store {
 }
 
 func (s Store) PrepareRun(runID string) error {
+	if err := os.MkdirAll(s.root(), 0o755); err != nil {
+		return err
+	}
+	runDir := s.RunDir(runID)
+	if err := os.Mkdir(runDir, 0o755); err != nil {
+		if os.IsExist(err) {
+			return fmt.Errorf("run directory already exists: %s", runDir)
+		}
+		return err
+	}
 	for _, dir := range []string{
-		s.RunDir(runID),
-		filepath.Join(s.RunDir(runID), "output"),
+		filepath.Join(runDir, "output"),
 		s.CarouselOutputDir(runID),
 		s.VideoOutputDir(runID),
 	} {
@@ -38,7 +47,18 @@ func (s Store) PrepareRun(runID string) error {
 }
 
 func (s Store) RunDir(runID string) string {
-	return filepath.Join(s.Root, runID)
+	return filepath.Join(s.root(), runID)
+}
+
+func (s Store) root() string {
+	if s.Root == "" {
+		return DefaultRoot
+	}
+	return s.Root
+}
+
+func (s Store) RemoveRun(runID string) error {
+	return os.RemoveAll(s.RunDir(runID))
 }
 
 func (s Store) BriefPath(runID string, version int) string {
@@ -47,6 +67,10 @@ func (s Store) BriefPath(runID string, version int) string {
 
 func (s Store) ContentPath(runID string) string {
 	return filepath.Join(s.RunDir(runID), "content.json")
+}
+
+func (s Store) ResearchPath(runID string) string {
+	return filepath.Join(s.RunDir(runID), "research.json")
 }
 
 func (s Store) HistoryPath(runID string) string {
