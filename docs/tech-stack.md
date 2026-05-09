@@ -45,6 +45,10 @@ TypeScript should own:
 - browser previews,
 - template editing interfaces.
 
+The first SvelteKit app is in `apps/web`. It uses the Go HTTP API through a
+small TypeScript client and keeps testable display logic in small helpers so UI
+state does not replace workflow-service behavior.
+
 ## Rendering Boundary
 
 The Go backend should call rendering workers through a clear boundary:

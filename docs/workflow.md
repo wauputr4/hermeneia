@@ -169,6 +169,11 @@ Versioning rules:
 - Render outputs live under content-type-specific output folders.
 - SQLite stores artifact rows with kind, path, checksum, run id, and brief version id.
 
+The SvelteKit web UI follows the same lifecycle through the Go API: create a
+run, inspect brief versions, submit revision instructions, trigger rendering,
+and review artifact metadata. The CLI remains the primary automation surface,
+while the UI provides a local review console for humans.
+
 ## 7. Export
 
 Supported MVP exports:

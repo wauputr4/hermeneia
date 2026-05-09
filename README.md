@@ -84,7 +84,8 @@ This repository has a CLI-first MVP workflow foundation:
 - mirror inspectable files under `runs/{run-id}/`,
 - render carousel PNG slides from structured content,
 - render a short-video MP4 path from structured scene JSON,
-- record generated artifact metadata and checksums in SQLite.
+- record generated artifact metadata and checksums in SQLite,
+- review runs, brief versions, revisions, and artifacts through the first SvelteKit web UI slice.
 
 ## Local Development
 
@@ -108,6 +109,17 @@ go run ./cmd/hermeneia revise <run-id> --instruction "Make the hook sharper"
 go run ./cmd/hermeneia render <run-id>
 go run ./cmd/hermeneia show <run-id>
 ```
+
+Web UI development:
+
+```bash
+go run ./cmd/hermeneia serve --addr 127.0.0.1:19317
+cd apps/web
+npm install
+npm run dev
+```
+
+The SvelteKit app reads the local Go API from `PUBLIC_HERMENEIA_API_BASE` and defaults to `http://127.0.0.1:19317`. The first UI slice supports run creation, run detail review, brief version inspection, revision instructions, and render/export triggering.
 
 By default, `hermeneia init` creates or migrates `data/hermeneia.db`. To use an isolated database path:
 

@@ -157,6 +157,35 @@ func TestWriteJSONEncodesBeforeCommittingStatus(t *testing.T) {
 	}
 }
 
+func TestServerAllowsLoopbackCORSPreflight(t *testing.T) {
+	handler := newTestHandler(t)
+	req := httptest.NewRequest(http.MethodOptions, "/v1/runs", nil)
+	req.Header.Set("Origin", "http://127.0.0.1:5173")
+	req.Header.Set("Access-Control-Request-Method", "GET")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assertStatus(t, rec, http.StatusNoContent)
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://127.0.0.1:5173" {
+		t.Fatalf("unexpected allow origin header: %q", got)
+	}
+}
+
+func TestServerRejectsNonLoopbackCORSOrigin(t *testing.T) {
+	handler := newTestHandler(t)
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req.Header.Set("Origin", "https://example.com")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assertStatus(t, rec, http.StatusOK)
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Fatalf("unexpected allow origin header: %q", got)
+	}
+}
+
 func newTestHandler(t *testing.T) http.Handler {
 	t.Helper()
 	db, err := storage.Open(filepath.Join(t.TempDir(), "hermeneia.db"))
