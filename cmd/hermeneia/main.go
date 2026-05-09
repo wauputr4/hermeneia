@@ -81,17 +81,6 @@ func (c command) run(ctx context.Context, args []string) error {
 	}
 }
 
-type stringList []string
-
-func (s *stringList) String() string {
-	return strings.Join(*s, ",")
-}
-
-func (s *stringList) Set(value string) error {
-	*s = append(*s, value)
-	return nil
-}
-
 func (c command) create(ctx context.Context, args []string) error {
 	fs := c.flagSet("create")
 	var input workflow.CreateInput
@@ -118,24 +107,9 @@ func (c command) create(ctx context.Context, args []string) error {
 }
 
 func (c command) research(ctx context.Context, args []string) error {
-	fs := c.flagSet("research")
-	var sources stringList
-	var input workflow.ResearchInput
-	fs.StringVar(&input.Topic, "topic", "", "content topic")
-	fs.StringVar(&input.ContentType, "type", "carousel", "content type: carousel or short_video")
-	fs.StringVar(&input.TemplateID, "template", "", "template id")
-	fs.StringVar(&input.Tone, "tone", "", "brief tone")
-	fs.StringVar(&input.Platform, "platform", "", "target platform")
-	fs.StringVar(&input.TargetAudience, "audience", "", "target audience")
-	fs.Var(&sources, "source", "source URL; repeat for multiple sources")
-	if err := fs.Parse(args); err != nil {
+	input, err := parseResearchArgs(args)
+	if err != nil {
 		return err
-	}
-	if input.Topic == "" && fs.NArg() > 0 {
-		input.Topic = strings.Join(fs.Args(), " ")
-	}
-	for _, source := range sources {
-		input.Sources = append(input.Sources, workflow.ResearchSource{URL: source})
 	}
 	return c.withService(ctx, func(s workflow.Service) error {
 		result, err := s.CreateRunFromResearch(ctx, input)
@@ -319,6 +293,96 @@ func parseReviseArgs(args []string) (string, string, error) {
 		runID = arg
 	}
 	return runID, instruction, nil
+}
+
+func parseResearchArgs(args []string) (workflow.ResearchInput, error) {
+	var input workflow.ResearchInput
+	var topicParts []string
+	input.ContentType = "carousel"
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if value, ok := strings.CutPrefix(arg, "--topic="); ok {
+			input.Topic = value
+			continue
+		}
+		if value, ok := strings.CutPrefix(arg, "--type="); ok {
+			input.ContentType = value
+			continue
+		}
+		if value, ok := strings.CutPrefix(arg, "--template="); ok {
+			input.TemplateID = value
+			continue
+		}
+		if value, ok := strings.CutPrefix(arg, "--tone="); ok {
+			input.Tone = value
+			continue
+		}
+		if value, ok := strings.CutPrefix(arg, "--platform="); ok {
+			input.Platform = value
+			continue
+		}
+		if value, ok := strings.CutPrefix(arg, "--audience="); ok {
+			input.TargetAudience = value
+			continue
+		}
+		if value, ok := strings.CutPrefix(arg, "--source="); ok {
+			input.Sources = append(input.Sources, workflow.ResearchSource{URL: value})
+			continue
+		}
+		switch arg {
+		case "--topic":
+			i++
+			if i >= len(args) {
+				return input, errors.New("--topic requires a value")
+			}
+			input.Topic = args[i]
+		case "--type":
+			i++
+			if i >= len(args) {
+				return input, errors.New("--type requires a value")
+			}
+			input.ContentType = args[i]
+		case "--template":
+			i++
+			if i >= len(args) {
+				return input, errors.New("--template requires a value")
+			}
+			input.TemplateID = args[i]
+		case "--tone":
+			i++
+			if i >= len(args) {
+				return input, errors.New("--tone requires a value")
+			}
+			input.Tone = args[i]
+		case "--platform":
+			i++
+			if i >= len(args) {
+				return input, errors.New("--platform requires a value")
+			}
+			input.Platform = args[i]
+		case "--audience":
+			i++
+			if i >= len(args) {
+				return input, errors.New("--audience requires a value")
+			}
+			input.TargetAudience = args[i]
+		case "--source":
+			i++
+			if i >= len(args) {
+				return input, errors.New("--source requires a value")
+			}
+			input.Sources = append(input.Sources, workflow.ResearchSource{URL: args[i]})
+		default:
+			if strings.HasPrefix(arg, "-") {
+				return input, fmt.Errorf("unknown flag %q", arg)
+			}
+			topicParts = append(topicParts, arg)
+		}
+	}
+	if input.Topic == "" && len(topicParts) > 0 {
+		input.Topic = strings.Join(topicParts, " ")
+	}
+	return input, nil
 }
 
 func (c command) printUsage() {

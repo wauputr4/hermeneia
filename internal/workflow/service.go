@@ -135,12 +135,16 @@ func (s Service) CreateRun(ctx context.Context, input CreateInput) (CreateResult
 		templateID = defaultTemplate(contentType)
 	}
 
+	b := draftBrief(input, contentType, templateID)
+	return s.createRunWithBrief(ctx, input, contentType, templateID, b, fmt.Sprintf("- v1 created from topic %q.\n", b.Topic))
+}
+
+func (s Service) createRunWithBrief(ctx context.Context, input CreateInput, contentType, templateID string, b brief.Brief, historyEntry string) (CreateResult, error) {
 	runID := s.newID("run", input.Topic)
 	if err := s.Files.PrepareRun(runID); err != nil {
 		return CreateResult{}, err
 	}
 
-	b := draftBrief(input, contentType, templateID)
 	body, err := marshalBrief(b)
 	if err != nil {
 		return CreateResult{}, err
@@ -163,7 +167,7 @@ func (s Service) CreateRun(ctx context.Context, input CreateInput) (CreateResult
 		return CreateResult{}, err
 	}
 	historyPath := s.Files.HistoryPath(runID)
-	if err := runfiles.WriteText(historyPath, fmt.Sprintf("# Hermeneia Run History\n\n- v1 created from topic %q.\n", b.Topic)); err != nil {
+	if err := runfiles.WriteText(historyPath, "# Hermeneia Run History\n\n"+historyEntry); err != nil {
 		return CreateResult{}, err
 	}
 	return CreateResult{Run: run, Brief: version, BriefPath: briefPath, HistoryPath: historyPath}, nil
@@ -194,21 +198,15 @@ func (s Service) CreateRunFromResearch(ctx context.Context, input ResearchInput)
 		Platform:       input.Platform,
 		TargetAudience: input.TargetAudience,
 	}
-	created, err := s.CreateRun(ctx, createInput)
+	plan := draftResearchPlan(input.Topic, contentType, templateID, sources)
+	initialBrief := draftBriefFromResearch(createInput, plan)
+	created, err := s.createRunWithBrief(ctx, createInput, contentType, templateID, initialBrief, fmt.Sprintf("- v1 created from research topic %q.\n", strings.TrimSpace(input.Topic)))
 	if err != nil {
 		return ResearchResult{}, err
 	}
 
-	plan := draftResearchPlan(input.Topic, contentType, templateID, sources)
 	researchPath := s.Files.ResearchPath(created.Run.ID)
 	if err := runfiles.WriteJSON(researchPath, plan); err != nil {
-		return ResearchResult{}, err
-	}
-	if err := s.replaceBriefWithResearchPlan(ctx, created.Run.ID, created.Brief.ID, createInput, plan); err != nil {
-		return ResearchResult{}, err
-	}
-	created.Brief, err = s.Repo.GetBriefVersion(ctx, created.Brief.ID)
-	if err != nil {
 		return ResearchResult{}, err
 	}
 	checksum, err := runfiles.Checksum(researchPath)
@@ -229,7 +227,6 @@ func (s Service) CreateRunFromResearch(ctx context.Context, input ResearchInput)
 	if err := runfiles.AppendText(created.HistoryPath, fmt.Sprintf("- research plan stored from %d source URLs.\n", len(sources))); err != nil {
 		return ResearchResult{}, err
 	}
-	created.BriefPath = s.Files.BriefPath(created.Run.ID, 1)
 	return ResearchResult{CreateResult: created, ResearchPath: researchPath, ResearchArtifact: artifact}, nil
 }
 
@@ -478,18 +475,6 @@ func normalizeResearchSources(sources []ResearchSource) []ResearchSource {
 		out = append(out, source)
 	}
 	return out
-}
-
-func (s Service) replaceBriefWithResearchPlan(ctx context.Context, runID, briefID string, input CreateInput, plan ResearchPlan) error {
-	b := draftBriefFromResearch(input, plan)
-	body, err := marshalBrief(b)
-	if err != nil {
-		return err
-	}
-	if err := s.Repo.UpdateBriefVersionBody(ctx, briefID, runID, body); err != nil {
-		return err
-	}
-	return runfiles.WriteJSON(s.Files.BriefPath(runID, 1), b)
 }
 
 func marshalBrief(b brief.Brief) (string, error) {

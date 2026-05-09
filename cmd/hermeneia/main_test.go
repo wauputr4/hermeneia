@@ -92,7 +92,7 @@ func TestCLIResearchCreatesTraceableRun(t *testing.T) {
 	}
 	err := cmd.run(ctx, []string{
 		"research",
-		"--topic", "AI agents in marketing",
+		"AI agents in marketing",
 		"--source", "https://example.com/agents",
 		"--source", "https://example.com/marketing",
 	})
