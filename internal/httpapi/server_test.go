@@ -3,7 +3,9 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -111,6 +113,36 @@ func TestServerResearchRunAndValidation(t *testing.T) {
 
 	missing := request(t, handler, http.MethodGet, "/v1/runs/missing", "")
 	assertStatus(t, missing, http.StatusNotFound)
+}
+
+func TestWriteServiceErrorStatusMapping(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want int
+	}{
+		{name: "not found", err: sql.ErrNoRows, want: http.StatusNotFound},
+		{name: "validation", err: fmt.Errorf("%w: topic is required", workflow.ErrInvalidInput), want: http.StatusBadRequest},
+		{name: "unexpected", err: errors.New("database is locked"), want: http.StatusInternalServerError},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			writeServiceError(rec, tt.err)
+			assertStatus(t, rec, tt.want)
+		})
+	}
+}
+
+func TestWriteJSONEncodesBeforeCommittingStatus(t *testing.T) {
+	rec := httptest.NewRecorder()
+
+	writeJSON(rec, http.StatusOK, map[string]any{"bad": make(chan int)})
+
+	assertStatus(t, rec, http.StatusInternalServerError)
+	if rec.Body.String() != "{\"error\":\"encode response\"}\n" {
+		t.Fatalf("unexpected encode error body: %q", rec.Body.String())
+	}
 }
 
 func newTestHandler(t *testing.T) http.Handler {

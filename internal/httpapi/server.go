@@ -117,26 +117,26 @@ func (s *Server) handleDeleteRun(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleListBriefs(w http.ResponseWriter, r *http.Request) {
-	details, err := s.service.ShowRun(r.Context(), r.PathValue("runID"))
+	briefVersions, err := s.service.ListBriefs(r.Context(), r.PathValue("runID"))
 	if err != nil {
 		writeServiceError(w, err)
 		return
 	}
-	briefs := make([]briefResponse, 0, len(details.Briefs))
-	for _, brief := range details.Briefs {
+	briefs := make([]briefResponse, 0, len(briefVersions))
+	for _, brief := range briefVersions {
 		briefs = append(briefs, newBriefResponse(brief))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"briefs": briefs})
 }
 
 func (s *Server) handleListArtifacts(w http.ResponseWriter, r *http.Request) {
-	details, err := s.service.ShowRun(r.Context(), r.PathValue("runID"))
+	artifactRows, err := s.service.ListArtifacts(r.Context(), r.PathValue("runID"))
 	if err != nil {
 		writeServiceError(w, err)
 		return
 	}
-	artifacts := make([]artifactResponse, 0, len(details.Artifacts))
-	for _, artifact := range details.Artifacts {
+	artifacts := make([]artifactResponse, 0, len(artifactRows))
+	for _, artifact := range artifactRows {
 		artifacts = append(artifacts, newArtifactResponse(artifact))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"artifacts": artifacts})
@@ -163,11 +163,7 @@ func (s *Server) handleReviseRun(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleRenderRun(w http.ResponseWriter, r *http.Request) {
 	result, err := s.service.RenderRun(r.Context(), r.PathValue("runID"))
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			writeError(w, http.StatusNotFound, err)
-			return
-		}
-		writeError(w, http.StatusInternalServerError, err)
+		writeServiceError(w, err)
 		return
 	}
 	artifacts := make([]artifactResponse, 0, len(result.Artifacts))
@@ -377,7 +373,11 @@ func writeServiceError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusNotFound, err)
 		return
 	}
-	writeError(w, http.StatusBadRequest, err)
+	if errors.Is(err, workflow.ErrInvalidInput) {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeError(w, http.StatusInternalServerError, err)
 }
 
 func writeError(w http.ResponseWriter, status int, err error) {
@@ -385,10 +385,19 @@ func writeError(w http.ResponseWriter, status int, err error) {
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
 	if status == http.StatusNoContent {
+		w.WriteHeader(status)
 		return
 	}
-	_ = json.NewEncoder(w).Encode(value)
+	data, err := json.Marshal(value)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("{\"error\":\"encode response\"}\n"))
+		return
+	}
+	data = append(data, '\n')
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_, _ = w.Write(data)
 }
