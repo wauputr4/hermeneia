@@ -101,3 +101,13 @@ Notes:
 - API responses should use rows loaded back from SQLite when they expose database-owned timestamps. Batch-load newly inserted render artifacts so timestamp hydration does not add one read query per generated file.
 - The API is intentionally local-first; authentication and multi-user concerns
   are deferred until hosted collaboration becomes part of the product scope.
+
+## 2026-05-09 — OpenAI research planner
+
+`hermeneia research` stays deterministic by default. Use `--planner openai` only when the process has both `OPENAI_API_KEY` and `OPENAI_MODEL` configured.
+
+Notes:
+
+- OpenAI planning calls the Responses API and requests structured JSON for the stored research plan.
+- Hermeneia overwrites the returned plan's `sources`, `topic`, `content_type`, and `template_id` with local request values before writing `research.json`, so source URL traceability remains under local control.
+- If `--planner openai` fails because configuration is missing, either set the two environment variables or omit the flag to use the deterministic planner.

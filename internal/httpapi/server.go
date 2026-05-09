@@ -201,6 +201,7 @@ func (r createRunRequest) toInput() workflow.CreateInput {
 type createResearchRunRequest struct {
 	createRunRequest
 	Sources []workflow.ResearchSource `json:"sources"`
+	Planner string                    `json:"planner"`
 }
 
 func (r createResearchRunRequest) toInput() workflow.ResearchInput {
@@ -213,6 +214,7 @@ func (r createResearchRunRequest) toInput() workflow.ResearchInput {
 		Platform:       input.Platform,
 		TargetAudience: input.TargetAudience,
 		Sources:        r.Sources,
+		Planner:        r.Planner,
 	}
 }
 

@@ -1,12 +1,15 @@
 package workflow
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"path/filepath"
 	"strings"
 	"time"
@@ -51,6 +54,7 @@ type Service struct {
 	Files    runfiles.Store
 	Carousel CarouselRenderer
 	Video    VideoRenderer
+	Planner  ResearchPlanner
 	Now      func() time.Time
 	NewID    func(prefix, seed string) string
 }
@@ -72,6 +76,7 @@ type ResearchInput struct {
 	Tone           string
 	TargetAudience string
 	Sources        []ResearchSource
+	Planner        string
 }
 
 type ResearchSource struct {
@@ -87,6 +92,7 @@ type ResearchPlan struct {
 	Ideas       []ResearchIdea   `json:"ideas"`
 	ContentType string           `json:"content_type"`
 	TemplateID  string           `json:"template_id"`
+	Planner     string           `json:"planner"`
 }
 
 type ResearchIdea struct {
@@ -129,12 +135,24 @@ type RunDetails struct {
 	Artifacts []storage.Artifact
 }
 
+type ResearchPlanner interface {
+	PlanResearch(context.Context, ResearchPlanningInput) (ResearchPlan, error)
+}
+
+type ResearchPlanningInput struct {
+	Topic       string
+	ContentType string
+	TemplateID  string
+	Sources     []ResearchSource
+}
+
 func NewService(repo *storage.Repository, files runfiles.Store) Service {
 	return Service{
 		Repo:     repo,
 		Files:    files,
 		Carousel: render.CarouselRenderer{},
 		Video:    render.VideoRenderer{},
+		Planner:  DeterministicResearchPlanner{},
 	}
 }
 
@@ -241,7 +259,19 @@ func (s Service) CreateRunFromResearch(ctx context.Context, input ResearchInput)
 		Platform:       input.Platform,
 		TargetAudience: input.TargetAudience,
 	}
-	plan := draftResearchPlan(input.Topic, contentType, templateID, sources)
+	planner, err := s.researchPlanner(input.Planner)
+	if err != nil {
+		return ResearchResult{}, err
+	}
+	plan, err := planner.PlanResearch(ctx, ResearchPlanningInput{
+		Topic:       strings.TrimSpace(input.Topic),
+		ContentType: contentType,
+		TemplateID:  templateID,
+		Sources:     sources,
+	})
+	if err != nil {
+		return ResearchResult{}, err
+	}
 	initialBrief := draftBriefFromResearch(createInput, plan)
 	created, err := s.createRunWithBrief(ctx, createInput, contentType, templateID, initialBrief, fmt.Sprintf("- v1 created from research topic %q.\n", strings.TrimSpace(input.Topic)))
 	if err != nil {
@@ -492,6 +522,113 @@ func (s Service) RenderRun(ctx context.Context, runID string) (RenderResult, err
 	return RenderResult{Run: run, Brief: latest, Content: content, Artifacts: artifacts}, nil
 }
 
+func (s Service) researchPlanner(requested string) (ResearchPlanner, error) {
+	switch strings.ToLower(strings.TrimSpace(requested)) {
+	case "", "auto":
+		if s.Planner != nil {
+			return s.Planner, nil
+		}
+		return DeterministicResearchPlanner{}, nil
+	case "deterministic":
+		return DeterministicResearchPlanner{}, nil
+	case "openai":
+		switch planner := s.Planner.(type) {
+		case OpenAIResearchPlanner:
+			return planner, nil
+		case *OpenAIResearchPlanner:
+			return planner, nil
+		default:
+			return nil, invalidInput("OPENAI_API_KEY and OPENAI_MODEL are required for --planner openai")
+		}
+	default:
+		return nil, invalidInput(fmt.Sprintf("unsupported research planner %q", requested))
+	}
+}
+
+type DeterministicResearchPlanner struct{}
+
+func (DeterministicResearchPlanner) PlanResearch(_ context.Context, input ResearchPlanningInput) (ResearchPlan, error) {
+	return draftResearchPlan(input.Topic, input.ContentType, input.TemplateID, input.Sources), nil
+}
+
+type OpenAIResearchPlanner struct {
+	APIKey     string
+	BaseURL    string
+	Model      string
+	HTTPClient *http.Client
+}
+
+func (p OpenAIResearchPlanner) PlanResearch(ctx context.Context, input ResearchPlanningInput) (ResearchPlan, error) {
+	apiKey := strings.TrimSpace(p.APIKey)
+	model := strings.TrimSpace(p.Model)
+	if apiKey == "" {
+		return ResearchPlan{}, invalidInput("OPENAI_API_KEY is required for the openai research planner")
+	}
+	if model == "" {
+		return ResearchPlan{}, invalidInput("OPENAI_MODEL is required for the openai research planner")
+	}
+	baseURL := strings.TrimRight(strings.TrimSpace(p.BaseURL), "/")
+	if baseURL == "" {
+		baseURL = "https://api.openai.com/v1"
+	}
+	store := false
+	body, err := json.Marshal(openAIResearchRequest{
+		Model:        model,
+		Instructions: openAIResearchInstructions,
+		Input:        openAIResearchPrompt(input),
+		Store:        &store,
+		Text: openAITextConfig{Format: openAITextFormat{
+			Type:        "json_schema",
+			Name:        "hermeneia_research_plan",
+			Description: "A concise Hermeneia research plan for a social content brief.",
+			Strict:      true,
+			Schema:      researchPlanSchema(),
+		}},
+	})
+	if err != nil {
+		return ResearchPlan{}, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/responses", bytes.NewReader(body))
+	if err != nil {
+		return ResearchPlan{}, err
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", "application/json")
+	client := p.HTTPClient
+	if client == nil {
+		client = &http.Client{Timeout: 45 * time.Second}
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return ResearchPlan{}, err
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return ResearchPlan{}, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return ResearchPlan{}, fmt.Errorf("openai research planner request failed: %s: %s", resp.Status, strings.TrimSpace(string(data)))
+	}
+	text := extractOpenAIOutputText(data)
+	if strings.TrimSpace(text) == "" {
+		return ResearchPlan{}, errors.New("openai research planner returned no output text")
+	}
+	var plan ResearchPlan
+	if err := json.Unmarshal([]byte(text), &plan); err != nil {
+		return ResearchPlan{}, fmt.Errorf("decode openai research plan: %w", err)
+	}
+	plan.Topic = strings.TrimSpace(input.Topic)
+	plan.ContentType = input.ContentType
+	plan.TemplateID = input.TemplateID
+	plan.Sources = input.Sources
+	plan.Planner = "openai"
+	if strings.TrimSpace(plan.Summary) == "" || len(plan.Ideas) == 0 {
+		return ResearchPlan{}, errors.New("openai research planner returned an incomplete plan")
+	}
+	return plan, nil
+}
+
 func draftBrief(input CreateInput, contentType, templateID string) brief.Brief {
 	topic := strings.TrimSpace(input.Topic)
 	tone := strings.TrimSpace(input.Tone)
@@ -556,7 +693,108 @@ func draftResearchPlan(topic, contentType, templateID string, sources []Research
 		Ideas:       ideas,
 		ContentType: contentType,
 		TemplateID:  templateID,
+		Planner:     "deterministic",
 	}
+}
+
+const openAIResearchInstructions = "You are Hermeneia's research planning assistant. Return only JSON matching the supplied schema. Preserve editorial caution: summarize only the provided source metadata and do not invent facts beyond the URLs, titles, and notes."
+
+type openAIResearchRequest struct {
+	Model        string           `json:"model"`
+	Instructions string           `json:"instructions"`
+	Input        string           `json:"input"`
+	Store        *bool            `json:"store,omitempty"`
+	Text         openAITextConfig `json:"text"`
+}
+
+type openAITextConfig struct {
+	Format openAITextFormat `json:"format"`
+}
+
+type openAITextFormat struct {
+	Type        string         `json:"type"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Strict      bool           `json:"strict"`
+	Schema      map[string]any `json:"schema"`
+}
+
+func openAIResearchPrompt(input ResearchPlanningInput) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Topic: %s\nContent type: %s\nTemplate: %s\n\nSources:\n", input.Topic, input.ContentType, input.TemplateID)
+	for i, source := range input.Sources {
+		fmt.Fprintf(&b, "%d. URL: %s\n", i+1, source.URL)
+		if source.Title != "" {
+			fmt.Fprintf(&b, "   Title: %s\n", source.Title)
+		}
+		if source.Note != "" {
+			fmt.Fprintf(&b, "   Note: %s\n", source.Note)
+		}
+	}
+	return b.String()
+}
+
+func researchPlanSchema() map[string]any {
+	sourceSchema := map[string]any{
+		"type":                 "object",
+		"additionalProperties": false,
+		"required":             []string{"url", "note", "title"},
+		"properties": map[string]any{
+			"url":   map[string]any{"type": "string"},
+			"note":  map[string]any{"type": "string"},
+			"title": map[string]any{"type": "string"},
+		},
+	}
+	ideaSchema := map[string]any{
+		"type":                 "object",
+		"additionalProperties": false,
+		"required":             []string{"title", "reason", "rank"},
+		"properties": map[string]any{
+			"title":  map[string]any{"type": "string"},
+			"reason": map[string]any{"type": "string"},
+			"rank":   map[string]any{"type": "integer"},
+		},
+	}
+	return map[string]any{
+		"type":                 "object",
+		"additionalProperties": false,
+		"required":             []string{"topic", "sources", "summary", "ideas", "content_type", "template_id", "planner"},
+		"properties": map[string]any{
+			"topic":        map[string]any{"type": "string"},
+			"sources":      map[string]any{"type": "array", "items": sourceSchema},
+			"summary":      map[string]any{"type": "string"},
+			"ideas":        map[string]any{"type": "array", "items": ideaSchema},
+			"content_type": map[string]any{"type": "string"},
+			"template_id":  map[string]any{"type": "string"},
+			"planner":      map[string]any{"type": "string"},
+		},
+	}
+}
+
+func extractOpenAIOutputText(data []byte) string {
+	var response struct {
+		OutputText string `json:"output_text"`
+		Output     []struct {
+			Content []struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"content"`
+		} `json:"output"`
+	}
+	if err := json.Unmarshal(data, &response); err != nil {
+		return ""
+	}
+	if response.OutputText != "" {
+		return response.OutputText
+	}
+	for _, item := range response.Output {
+		for _, content := range item.Content {
+			if content.Type == "output_text" && content.Text != "" {
+				return content.Text
+			}
+		}
+	}
+	return ""
 }
 
 func normalizeResearchSources(sources []ResearchSource) []ResearchSource {

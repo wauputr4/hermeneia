@@ -242,6 +242,7 @@ func (c command) withService(ctx context.Context, fn func(workflow.Service) erro
 	service := workflow.NewService(storage.NewRepository(db), runfiles.New(c.runsRoot))
 	service.Now = c.now
 	service.NewID = c.newID
+	service.Planner = researchPlannerFromEnv()
 	return fn(service)
 }
 
@@ -354,6 +355,10 @@ func parseResearchArgs(args []string) (workflow.ResearchInput, error) {
 			input.Sources = append(input.Sources, workflow.ResearchSource{URL: value})
 			continue
 		}
+		if value, ok := strings.CutPrefix(arg, "--planner="); ok {
+			input.Planner = value
+			continue
+		}
 		switch arg {
 		case "--topic":
 			i++
@@ -398,6 +403,12 @@ func parseResearchArgs(args []string) (workflow.ResearchInput, error) {
 				return input, errors.New("--source requires a value")
 			}
 			input.Sources = append(input.Sources, workflow.ResearchSource{URL: args[i]})
+		case "--planner":
+			i++
+			if i >= len(args) {
+				return input, errors.New("--planner requires a value")
+			}
+			input.Planner = args[i]
 		default:
 			if strings.HasPrefix(arg, "-") {
 				return input, fmt.Errorf("unknown flag %q", arg)
@@ -412,6 +423,17 @@ func parseResearchArgs(args []string) (workflow.ResearchInput, error) {
 		input.Topic = strings.Join(topicParts, " ")
 	}
 	return input, nil
+}
+
+func researchPlannerFromEnv() workflow.ResearchPlanner {
+	if strings.TrimSpace(os.Getenv("OPENAI_API_KEY")) == "" || strings.TrimSpace(os.Getenv("OPENAI_MODEL")) == "" {
+		return workflow.DeterministicResearchPlanner{}
+	}
+	return workflow.OpenAIResearchPlanner{
+		APIKey:  os.Getenv("OPENAI_API_KEY"),
+		BaseURL: os.Getenv("OPENAI_BASE_URL"),
+		Model:   os.Getenv("OPENAI_MODEL"),
+	}
 }
 
 func (c command) printUsage() {

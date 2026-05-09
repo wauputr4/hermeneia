@@ -125,6 +125,30 @@ func TestCLIResearchRejectsStrayArgsWhenTopicIsSet(t *testing.T) {
 	}
 }
 
+func TestCLIResearchOpenAIPlannerRequiresConfig(t *testing.T) {
+	ctx := context.Background()
+	var stdout bytes.Buffer
+	dbPath := filepath.Join(t.TempDir(), "hermeneia.db")
+	runsRoot := filepath.Join(t.TempDir(), "runs")
+	t.Setenv("HERMENEIA_DATABASE_PATH", dbPath)
+	t.Setenv("OPENAI_API_KEY", "")
+	t.Setenv("OPENAI_MODEL", "")
+
+	cmd := command{stdout: &stdout, runsRoot: runsRoot}
+	err := cmd.run(ctx, []string{
+		"research",
+		"--topic", "AI agents",
+		"--source", "https://example.com/agents",
+		"--planner", "openai",
+	})
+	if err == nil {
+		t.Fatal("expected missing OpenAI config error")
+	}
+	if got := err.Error(); !strings.Contains(got, "OPENAI_API_KEY") || !strings.Contains(got, "OPENAI_MODEL") {
+		t.Fatalf("unexpected error: %q", got)
+	}
+}
+
 func TestCLIContentRunWorkflow(t *testing.T) {
 	ctx := context.Background()
 	var stdout bytes.Buffer
