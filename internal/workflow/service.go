@@ -22,6 +22,22 @@ const (
 	ContentTypeShortVideo = "short_video"
 )
 
+var ErrInvalidInput = errors.New("invalid input")
+
+type inputError string
+
+func (e inputError) Error() string {
+	return string(e)
+}
+
+func (e inputError) Unwrap() error {
+	return ErrInvalidInput
+}
+
+func invalidInput(message string) error {
+	return inputError(message)
+}
+
 type CarouselRenderer interface {
 	Render(context.Context, render.CarouselContent, string) ([]render.OutputFile, error)
 }
@@ -128,7 +144,7 @@ func (s Service) CreateRun(ctx context.Context, input CreateInput) (CreateResult
 		return CreateResult{}, err
 	}
 	if strings.TrimSpace(input.Topic) == "" {
-		return CreateResult{}, errors.New("topic is required")
+		return CreateResult{}, invalidInput("topic is required")
 	}
 	templateID := strings.TrimSpace(input.TemplateID)
 	if templateID == "" {
@@ -198,11 +214,11 @@ func (s Service) CreateRunFromResearch(ctx context.Context, input ResearchInput)
 		return ResearchResult{}, err
 	}
 	if strings.TrimSpace(input.Topic) == "" {
-		return ResearchResult{}, errors.New("topic is required")
+		return ResearchResult{}, invalidInput("topic is required")
 	}
 	sources := normalizeResearchSources(input.Sources)
 	if len(sources) == 0 {
-		return ResearchResult{}, errors.New("at least one source URL is required")
+		return ResearchResult{}, invalidInput("at least one source URL is required")
 	}
 	templateID := strings.TrimSpace(input.TemplateID)
 	if templateID == "" {
@@ -260,7 +276,7 @@ func (s Service) ListRuns(ctx context.Context) ([]storage.ContentRun, error) {
 func (s Service) ShowRun(ctx context.Context, runID string) (RunDetails, error) {
 	runID = strings.TrimSpace(runID)
 	if runID == "" {
-		return RunDetails{}, errors.New("run id is required")
+		return RunDetails{}, invalidInput("run id is required")
 	}
 	run, err := s.Repo.GetContentRun(ctx, runID)
 	if err != nil {
@@ -281,14 +297,50 @@ func (s Service) ShowRun(ctx context.Context, runID string) (RunDetails, error) 
 	return RunDetails{Run: run, Briefs: briefs, Revisions: revisions, Artifacts: artifacts}, nil
 }
 
+func (s Service) ListBriefs(ctx context.Context, runID string) ([]storage.BriefVersion, error) {
+	runID = strings.TrimSpace(runID)
+	if runID == "" {
+		return nil, invalidInput("run id is required")
+	}
+	if _, err := s.Repo.GetContentRun(ctx, runID); err != nil {
+		return nil, err
+	}
+	return s.Repo.ListBriefVersions(ctx, runID)
+}
+
+func (s Service) ListArtifacts(ctx context.Context, runID string) ([]storage.Artifact, error) {
+	runID = strings.TrimSpace(runID)
+	if runID == "" {
+		return nil, invalidInput("run id is required")
+	}
+	if _, err := s.Repo.GetContentRun(ctx, runID); err != nil {
+		return nil, err
+	}
+	return s.Repo.ListArtifactsByRun(ctx, runID)
+}
+
+func (s Service) DeleteRun(ctx context.Context, runID string) error {
+	runID = strings.TrimSpace(runID)
+	if runID == "" {
+		return invalidInput("run id is required")
+	}
+	if _, err := s.Repo.GetContentRun(ctx, runID); err != nil {
+		return err
+	}
+	if err := s.Repo.DeleteContentRun(ctx, runID); err != nil {
+		return err
+	}
+	return s.Files.RemoveRun(runID)
+}
+
 func (s Service) ReviseRun(ctx context.Context, runID, instruction string) (ReviseResult, error) {
 	runID = strings.TrimSpace(runID)
 	instruction = strings.TrimSpace(instruction)
 	if runID == "" {
-		return ReviseResult{}, errors.New("run id is required")
+		return ReviseResult{}, invalidInput("run id is required")
 	}
 	if instruction == "" {
-		return ReviseResult{}, errors.New("revision instruction is required")
+		return ReviseResult{}, invalidInput("revision instruction is required")
 	}
 	run, err := s.Repo.GetContentRun(ctx, runID)
 	if err != nil {
@@ -340,7 +392,7 @@ func (s Service) ReviseRun(ctx context.Context, runID, instruction string) (Revi
 func (s Service) RenderRun(ctx context.Context, runID string) (RenderResult, error) {
 	runID = strings.TrimSpace(runID)
 	if runID == "" {
-		return RenderResult{}, errors.New("run id is required")
+		return RenderResult{}, invalidInput("run id is required")
 	}
 	run, err := s.Repo.GetContentRun(ctx, runID)
 	if err != nil {
@@ -515,7 +567,7 @@ func normalizeContentType(value string) (string, error) {
 	case "video", "short-video", ContentTypeShortVideo:
 		return ContentTypeShortVideo, nil
 	default:
-		return "", fmt.Errorf("unsupported content type %q", value)
+		return "", invalidInput(fmt.Sprintf("unsupported content type %q", value))
 	}
 }
 

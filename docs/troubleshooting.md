@@ -88,3 +88,15 @@ Notes:
 - The temporary local MP4 renderer requires `ffmpeg` on `PATH`; the Remotion scaffold in `packages/renderer-video` uses the same structured JSON contract for the future TypeScript renderer.
 
 If video rendering fails with an `ffmpeg is required` message, install `ffmpeg` locally or render only carousel runs until the Remotion worker is wired into the CLI.
+
+## 2026-05-09 — HTTP API MVP slice
+
+The local HTTP API is exposed through `hermeneia serve --addr 127.0.0.1:8080`.
+
+Notes:
+
+- API handlers live under `internal/httpapi`.
+- Handlers call the same `workflow.Service` methods as the CLI.
+- Route docs live in `docs/api.md`.
+- The API is intentionally local-first; authentication and multi-user concerns
+  are deferred until hosted collaboration becomes part of the product scope.

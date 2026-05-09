@@ -63,8 +63,16 @@ Goal:
 
 Build a simple UI to view runs, edit briefs, pick templates, preview outputs, and export assets.
 
+Initial API slice:
+
+- `hermeneia serve` exposes the local JSON API.
+- API handlers call the same Go workflow service as the CLI.
+- Routes cover run create/list/show/delete, brief and artifact listing,
+  revision, render, and research-run creation.
+
 Deliverables:
 
+- Go HTTP API for web and agents.
 - SvelteKit app.
 - Run list.
 - Brief editor.
