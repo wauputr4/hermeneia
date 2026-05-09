@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"text/tabwriter"
 	"time"
 
 	"github.com/wauputr4/hermeneia/internal/runfiles"
@@ -120,10 +121,12 @@ func (c command) list(ctx context.Context, args []string) error {
 			fmt.Fprintln(c.stdout, "no content runs found")
 			return nil
 		}
+		w := tabwriter.NewWriter(c.stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "RUN ID\tTYPE\tTEMPLATE\tTOPIC")
 		for _, run := range runs {
-			fmt.Fprintf(c.stdout, "%s\t%s\t%s\t%s\n", run.ID, run.ContentType, run.TemplateID, run.Topic)
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", run.ID, run.ContentType, run.TemplateID, run.Topic)
 		}
-		return nil
+		return w.Flush()
 	})
 }
 
@@ -137,17 +140,18 @@ func (c command) show(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(c.stdout, "run: %s\n", details.Run.ID)
-		fmt.Fprintf(c.stdout, "topic: %s\n", details.Run.Topic)
-		fmt.Fprintf(c.stdout, "type: %s\n", details.Run.ContentType)
-		fmt.Fprintf(c.stdout, "template: %s\n", details.Run.TemplateID)
-		fmt.Fprintf(c.stdout, "brief_versions: %d\n", len(details.Briefs))
-		fmt.Fprintf(c.stdout, "revisions: %d\n", len(details.Revisions))
-		fmt.Fprintf(c.stdout, "artifacts: %d\n", len(details.Artifacts))
+		w := tabwriter.NewWriter(c.stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintf(w, "run:\t%s\n", details.Run.ID)
+		fmt.Fprintf(w, "topic:\t%s\n", details.Run.Topic)
+		fmt.Fprintf(w, "type:\t%s\n", details.Run.ContentType)
+		fmt.Fprintf(w, "template:\t%s\n", details.Run.TemplateID)
+		fmt.Fprintf(w, "brief_versions:\t%d\n", len(details.Briefs))
+		fmt.Fprintf(w, "revisions:\t%d\n", len(details.Revisions))
+		fmt.Fprintf(w, "artifacts:\t%d\n", len(details.Artifacts))
 		for _, artifact := range details.Artifacts {
-			fmt.Fprintf(c.stdout, "- %s %s\n", artifact.Kind, artifact.Path)
+			fmt.Fprintf(w, "-\t%s\t%s\n", artifact.Kind, artifact.Path)
 		}
-		return nil
+		return w.Flush()
 	})
 }
 
@@ -177,10 +181,11 @@ func (c command) render(ctx context.Context, args []string) error {
 			return err
 		}
 		fmt.Fprintf(c.stdout, "rendered run %s from brief v%d\n", result.Run.ID, result.Brief.Version)
+		w := tabwriter.NewWriter(c.stdout, 0, 0, 2, ' ', 0)
 		for _, artifact := range result.Artifacts {
-			fmt.Fprintf(c.stdout, "- %s %s\n", artifact.Kind, artifact.Path)
+			fmt.Fprintf(w, "-\t%s\t%s\n", artifact.Kind, artifact.Path)
 		}
-		return nil
+		return w.Flush()
 	})
 }
 

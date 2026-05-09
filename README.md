@@ -119,7 +119,7 @@ Current CLI surface:
 - `hermeneia create` creates a run, writes `brief.v1.json`, and stores SQLite metadata.
 - `hermeneia list` lists stored runs.
 - `hermeneia show` displays run, version, revision, and artifact counts.
-- `hermeneia revise` creates the next brief version and records a revision event.
+- `hermeneia revise` creates the next brief version and records a revision event. In the MVP it applies a deterministic revision note instead of calling an LLM.
 - `hermeneia render` writes `content.json`, generates output assets, and stores artifact references.
 
 Default MVP templates:

@@ -80,6 +80,7 @@ Notes:
 
 - `create` writes `brief.v1.json`, creates the deterministic run folder, and stores run metadata in SQLite.
 - `revise` appends a new `brief.v{n}.json` and records a revision event without overwriting older brief files.
+- MVP revision behavior is deterministic: the CLI records the human instruction, appends a visible revision note, and preserves version history. It is not yet an LLM rewrite pipeline.
 - `render` writes `content.json`, renderer outputs, artifact rows, and checksums.
 - Carousel output is generated as PNG slides under `runs/{run-id}/output/carousel/`.
 - Video output writes `output/video/remotion-input.json` and `output/video/ai-news-short.mp4`.

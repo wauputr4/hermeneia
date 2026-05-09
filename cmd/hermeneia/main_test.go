@@ -127,7 +127,7 @@ func TestCLIContentRunWorkflow(t *testing.T) {
 	if err := cmd.run(ctx, []string{"show", "run-cli"}); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"run: run-cli", "brief_versions: 2", "artifacts:"} {
+	for _, want := range []string{"run:", "run-cli", "brief_versions:", "2", "artifacts:"} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("show output missing %q:\n%s", want, stdout.String())
 		}

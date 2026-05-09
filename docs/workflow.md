@@ -114,6 +114,8 @@ brief.v2.json
 history.md
 ```
 
+The MVP CLI revision path is deterministic. It records the revision instruction, creates the next brief version, and adds a visible revision note. Later AI-assisted revision can replace that placeholder while keeping the same append-only version contract.
+
 ## File Artifact Convention
 
 Generated run files use this deterministic layout:
