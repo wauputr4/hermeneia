@@ -71,3 +71,19 @@ Notes:
 - `hermeneia init` uses `HERMENEIA_DATABASE_PATH` or defaults to `data/hermeneia.db`.
 - Planned commands (`create`, `list`, `show`, `revise`, `render`) intentionally return clear "not implemented yet" errors until the workflow services are implemented.
 - Unknown commands should point users back to `hermeneia help` instead of failing silently.
+
+## 2026-05-09 — CLI MVP workflow and render path
+
+The MVP CLI now supports `create`, `list`, `show`, `revise`, and `render`.
+
+Notes:
+
+- `create` writes `brief.v1.json`, creates the deterministic run folder, and stores run metadata in SQLite.
+- `revise` appends a new `brief.v{n}.json` and records a revision event without overwriting older brief files.
+- MVP revision behavior is deterministic: the CLI records the human instruction, appends a visible revision note, and preserves version history. It is not yet an LLM rewrite pipeline.
+- `render` writes `content.json`, renderer outputs, artifact rows, and checksums.
+- Carousel output is generated as PNG slides under `runs/{run-id}/output/carousel/`.
+- Video output writes `output/video/remotion-input.json` and `output/video/ai-news-short.mp4`.
+- The temporary local MP4 renderer requires `ffmpeg` on `PATH`; the Remotion scaffold in `packages/renderer-video` uses the same structured JSON contract for the future TypeScript renderer.
+
+If video rendering fails with an `ffmpeg is required` message, install `ffmpeg` locally or render only carousel runs until the Remotion worker is wired into the CLI.

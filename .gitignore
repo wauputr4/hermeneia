@@ -21,6 +21,8 @@ runs/*
 .idea/
 
 # Local database
+data/*.db
+data/*.db-*
 data/*.sqlite
 data/*.sqlite-*
 !data/.gitkeep

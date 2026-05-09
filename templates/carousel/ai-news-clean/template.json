@@ -1,0 +1,16 @@
+{
+  "id": "carousel/ai-news-clean",
+  "name": "AI News Clean Carousel",
+  "content_type": "carousel",
+  "renderer": "go-png",
+  "slide_size": {
+    "width": 1080,
+    "height": 1350
+  },
+  "supported_slide_types": [
+    "cover",
+    "point",
+    "closing"
+  ],
+  "output": "runs/{run-id}/output/carousel/slide-{n}.png"
+}

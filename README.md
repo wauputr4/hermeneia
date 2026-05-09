@@ -77,7 +77,14 @@ TypeScript remains important because Remotion and web UI workflows are naturally
 
 ## Repository Status
 
-This repository is currently in planning/scaffolding mode.
+This repository has a CLI-first MVP workflow foundation:
+
+- create a deterministic content run from a topic,
+- store the brief and revision history in SQLite,
+- mirror inspectable files under `runs/{run-id}/`,
+- render carousel PNG slides from structured content,
+- render a short-video MP4 path from structured scene JSON,
+- record generated artifact metadata and checksums in SQLite.
 
 ## Local Development
 
@@ -86,6 +93,7 @@ Hermeneia is currently CLI-first. The Go entrypoint lives at `cmd/hermeneia`.
 Prerequisites:
 
 - Go toolchain compatible with the version in `go.mod`.
+- `ffmpeg` on `PATH` when rendering the temporary local MP4 video output.
 
 Common commands:
 
@@ -93,6 +101,10 @@ Common commands:
 go test ./...
 go run ./cmd/hermeneia help
 go run ./cmd/hermeneia init
+go run ./cmd/hermeneia create --topic "AI agents in marketing" --type carousel
+go run ./cmd/hermeneia revise <run-id> --instruction "Make the hook sharper"
+go run ./cmd/hermeneia render <run-id>
+go run ./cmd/hermeneia show <run-id>
 ```
 
 By default, `hermeneia init` creates or migrates `data/hermeneia.db`. To use an isolated database path:
@@ -104,7 +116,16 @@ HERMENEIA_DATABASE_PATH=/tmp/hermeneia.db go run ./cmd/hermeneia init
 Current CLI surface:
 
 - `hermeneia init` initializes SQLite storage.
-- `hermeneia create`, `list`, `show`, `revise`, and `render` are reserved in the help output and currently return clear planned-command errors until their workflow services are implemented.
+- `hermeneia create` creates a run, writes `brief.v1.json`, and stores SQLite metadata.
+- `hermeneia list` lists stored runs.
+- `hermeneia show` displays run, version, revision, and artifact counts.
+- `hermeneia revise` creates the next brief version and records a revision event. In the MVP it applies a deterministic revision note instead of calling an LLM.
+- `hermeneia render` writes `content.json`, generates output assets, and stores artifact references.
+
+Default MVP templates:
+
+- `carousel/ai-news-clean`
+- `video/ai-news-short`
 
 ## License
 

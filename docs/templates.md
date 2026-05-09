@@ -31,6 +31,27 @@ Example slide types:
 - stat,
 - closing CTA.
 
+MVP template:
+
+- `carousel/ai-news-clean`
+
+The first implementation lives in the Go renderer and writes `1080x1350` PNG slides. The template manifest is stored at `templates/carousel/ai-news-clean/template.json`.
+
+Carousel input contract:
+
+```json
+{
+  "template": "carousel/ai-news-clean",
+  "slides": [
+    {"type": "cover", "headline": "...", "body": "..."},
+    {"type": "point", "headline": "...", "body": "..."},
+    {"type": "closing", "headline": "...", "body": "..."}
+  ],
+  "caption": "...",
+  "hashtags": ["#Hermeneia"]
+}
+```
+
 ## Video Template
 
 A video template should define:
@@ -45,6 +66,26 @@ A video template should define:
 - caption placement.
 
 Remotion should power video templates.
+
+MVP template:
+
+- `video/ai-news-short`
+
+The Go CLI writes the Remotion input contract to `runs/{run-id}/output/video/remotion-input.json` and produces `ai-news-short.mp4` for the MVP loop. A Remotion composition scaffold is available in `packages/renderer-video` and consumes the same scene JSON contract.
+
+Video input contract:
+
+```json
+{
+  "template": "video/ai-news-short",
+  "aspect_ratio": "9:16",
+  "fps": 30,
+  "scenes": [
+    {"duration_seconds": 3, "text": "...", "visual": "..."}
+  ],
+  "caption": "..."
+}
+```
 
 ## Template Input Contract
 
