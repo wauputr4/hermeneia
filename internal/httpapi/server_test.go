@@ -29,6 +29,9 @@ func TestServerContentRunWorkflow(t *testing.T) {
 	if created.Run.ID == "" || created.Brief.Version != 1 {
 		t.Fatalf("unexpected create response: %#v", created)
 	}
+	if created.Run.CreatedAt.IsZero() || created.Brief.CreatedAt.IsZero() {
+		t.Fatalf("expected create response timestamps, got run=%s brief=%s", created.Run.CreatedAt, created.Brief.CreatedAt)
+	}
 
 	list := request(t, handler, http.MethodGet, "/v1/runs", "")
 	assertStatus(t, list, http.StatusOK)
@@ -55,6 +58,9 @@ func TestServerContentRunWorkflow(t *testing.T) {
 	if revised.Brief.Version != 2 || revised.Previous.Version != 1 {
 		t.Fatalf("unexpected revision response: %#v", revised)
 	}
+	if revised.Brief.CreatedAt.IsZero() {
+		t.Fatalf("expected revision timestamp, got %s", revised.Brief.CreatedAt)
+	}
 
 	briefs := request(t, handler, http.MethodGet, "/v1/runs/"+created.Run.ID+"/briefs", "")
 	assertStatus(t, briefs, http.StatusOK)
@@ -72,6 +78,9 @@ func TestServerContentRunWorkflow(t *testing.T) {
 	decodeResponse(t, rendered, &renderResult)
 	if len(renderResult.Artifacts) == 0 {
 		t.Fatalf("expected render artifacts: %#v", renderResult)
+	}
+	if renderResult.Artifacts[0].CreatedAt.IsZero() {
+		t.Fatalf("expected render artifact timestamp, got %s", renderResult.Artifacts[0].CreatedAt)
 	}
 
 	artifacts := request(t, handler, http.MethodGet, "/v1/runs/"+created.Run.ID+"/artifacts", "")
@@ -103,6 +112,9 @@ func TestServerResearchRunAndValidation(t *testing.T) {
 	decodeResponse(t, research, &created)
 	if created.ResearchPath == "" || created.ResearchArtifact.Kind != "research_json" {
 		t.Fatalf("unexpected research response: %#v", created)
+	}
+	if created.Run.CreatedAt.IsZero() || created.Brief.CreatedAt.IsZero() || created.ResearchArtifact.CreatedAt.IsZero() {
+		t.Fatalf("expected research response timestamps: %#v", created)
 	}
 
 	invalid := request(t, handler, http.MethodPost, "/v1/runs", `{"content_type":"carousel"}`)

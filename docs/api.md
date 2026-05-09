@@ -7,7 +7,7 @@ workflow service used by the CLI.
 Run it locally with:
 
 ```bash
-hermeneia serve --addr 127.0.0.1:8080
+hermeneia serve --addr 127.0.0.1:19317
 ```
 
 The server uses the same configuration as the CLI:

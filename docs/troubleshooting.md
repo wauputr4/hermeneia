@@ -91,7 +91,7 @@ If video rendering fails with an `ffmpeg is required` message, install `ffmpeg` 
 
 ## 2026-05-09 — HTTP API MVP slice
 
-The local HTTP API is exposed through `hermeneia serve --addr 127.0.0.1:8080`.
+The local HTTP API is exposed through `hermeneia serve --addr 127.0.0.1:19317`.
 
 Notes:
 
