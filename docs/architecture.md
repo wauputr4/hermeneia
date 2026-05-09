@@ -36,6 +36,10 @@ Responsibilities:
 - Trigger research, generation, rendering, and export jobs.
 - Expose HTTP API for the web UI and automation.
 
+The MVP HTTP surface is documented in [HTTP API](api.md). It intentionally calls
+the same workflow service as the CLI so web and agent integrations do not fork
+business rules.
+
 ### CLI
 
 Written in Go.

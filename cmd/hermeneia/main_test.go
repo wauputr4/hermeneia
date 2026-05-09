@@ -26,6 +26,7 @@ func TestHelpOutputIncludesMVPCommandSurface(t *testing.T) {
 		"hermeneia show",
 		"hermeneia revise",
 		"hermeneia render",
+		"hermeneia serve",
 		"HERMENEIA_DATABASE_PATH",
 	} {
 		if !strings.Contains(output, want) {

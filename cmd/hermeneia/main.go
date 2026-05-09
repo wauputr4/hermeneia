@@ -6,11 +6,13 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 	"text/tabwriter"
 	"time"
 
+	"github.com/wauputr4/hermeneia/internal/httpapi"
 	"github.com/wauputr4/hermeneia/internal/runfiles"
 	"github.com/wauputr4/hermeneia/internal/storage"
 	"github.com/wauputr4/hermeneia/internal/workflow"
@@ -76,6 +78,8 @@ func (c command) run(ctx context.Context, args []string) error {
 		return c.revise(ctx, args[1:])
 	case "render":
 		return c.render(ctx, args[1:])
+	case "serve":
+		return c.serve(ctx, args[1:])
 	default:
 		return fmt.Errorf("unknown command %q; run \"hermeneia help\" for usage", args[0])
 	}
@@ -203,6 +207,25 @@ func (c command) render(ctx context.Context, args []string) error {
 			fmt.Fprintf(w, "-\t%s\t%s\n", artifact.Kind, artifact.Path)
 		}
 		return w.Flush()
+	})
+}
+
+func (c command) serve(ctx context.Context, args []string) error {
+	fs := c.flagSet("serve")
+	addr := fs.String("addr", "127.0.0.1:8080", "HTTP listen address")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() > 0 {
+		return fmt.Errorf("serve does not accept positional arguments")
+	}
+	return c.withService(ctx, func(s workflow.Service) error {
+		server := &http.Server{Addr: *addr, Handler: httpapi.New(s)}
+		fmt.Fprintf(c.stdout, "serving Hermeneia API at http://%s\n", *addr)
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return err
+		}
+		return nil
 	})
 }
 
@@ -402,6 +425,7 @@ Usage:
   hermeneia show              show a content run
   hermeneia revise            create a new brief revision
   hermeneia render            render/export run artifacts
+  hermeneia serve             run the local HTTP API
 
 Help:
   hermeneia help
@@ -414,5 +438,6 @@ Examples:
   hermeneia create --topic "AI agents in marketing" --type carousel
   hermeneia research --topic "AI agents" --source "https://example.com/news"
   hermeneia revise <run-id> --instruction "Make the hook sharper"
-  hermeneia render <run-id>`)
+  hermeneia render <run-id>
+  hermeneia serve --addr 127.0.0.1:8080`)
 }

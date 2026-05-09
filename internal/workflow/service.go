@@ -281,6 +281,20 @@ func (s Service) ShowRun(ctx context.Context, runID string) (RunDetails, error) 
 	return RunDetails{Run: run, Briefs: briefs, Revisions: revisions, Artifacts: artifacts}, nil
 }
 
+func (s Service) DeleteRun(ctx context.Context, runID string) error {
+	runID = strings.TrimSpace(runID)
+	if runID == "" {
+		return errors.New("run id is required")
+	}
+	if _, err := s.Repo.GetContentRun(ctx, runID); err != nil {
+		return err
+	}
+	if err := s.Repo.DeleteContentRun(ctx, runID); err != nil {
+		return err
+	}
+	return s.Files.RemoveRun(runID)
+}
+
 func (s Service) ReviseRun(ctx context.Context, runID, instruction string) (ReviseResult, error) {
 	runID = strings.TrimSpace(runID)
 	instruction = strings.TrimSpace(instruction)
