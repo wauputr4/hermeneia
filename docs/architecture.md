@@ -63,6 +63,10 @@ Responsibilities:
 - Track revision history.
 - Export or schedule content.
 
+The first local UI slice lives under `apps/web` and consumes the Go HTTP API.
+It should remain a client of the workflow service rather than duplicating run,
+brief, revision, or render rules in frontend state.
+
 ### Video Renderer
 
 Built with Remotion.

@@ -111,3 +111,17 @@ Notes:
 - OpenAI planning calls the Responses API and requests structured JSON for the stored research plan.
 - Hermeneia overwrites the returned plan's `sources`, `topic`, `content_type`, and `template_id` with local request values before writing `research.json`, so source URL traceability remains under local control.
 - If `--planner openai` fails because configuration is missing, either set the two environment variables or omit the flag to use the deterministic planner.
+
+## 2026-05-09 — SvelteKit web UI slice
+
+The local web UI in `apps/web` expects the Go API to be running first:
+
+```bash
+go run ./cmd/hermeneia serve --addr 127.0.0.1:19317
+```
+
+Notes:
+
+- The frontend defaults to `http://127.0.0.1:19317`; set `PUBLIC_HERMENEIA_API_BASE` if the API runs elsewhere.
+- Browser CORS behavior may matter once the dev server and API use different origins. Keep local API development on loopback and add explicit API CORS handling before exposing it outside local development.
+- Run `npm test` inside `apps/web` for view-model helper coverage. Full SvelteKit build validation requires installing frontend dependencies with `npm install`.

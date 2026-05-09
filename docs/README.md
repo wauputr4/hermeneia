@@ -7,6 +7,7 @@ This documentation describes the project concept, architecture, MVP scope, roadm
 - [Project Concept](concept.md)
 - [Architecture](architecture.md)
 - [HTTP API](api.md)
+- [Web UI](web-ui.md)
 - [Technology Stack](tech-stack.md)
 - [Workflow](workflow.md)
 - [Schemas](schemas.md)
