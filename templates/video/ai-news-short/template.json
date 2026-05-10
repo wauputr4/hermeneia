@@ -2,9 +2,38 @@
   "id": "video/ai-news-short",
   "name": "AI News Short Video",
   "content_type": "short_video",
-  "renderer": "remotion-contract-ffmpeg-mvp",
+  "description": "A 9:16 short-video contract for AI news clips rendered through the MVP Remotion-compatible path.",
+  "version": "1.0.0",
   "aspect_ratio": "9:16",
-  "fps": 30,
-  "scene_contract": "runs/{run-id}/output/video/remotion-input.json",
-  "output": "runs/{run-id}/output/video/ai-news-short.mp4"
+  "renderer": "remotion-contract-ffmpeg-mvp",
+  "output_kinds": [
+    "content_json",
+    "video_remotion_input",
+    "video_mp4"
+  ],
+  "input_schema": {
+    "type": "object",
+    "required": ["template", "aspect_ratio", "fps", "scenes", "caption"],
+    "properties": {
+      "template": {"const": "video/ai-news-short"},
+      "aspect_ratio": {"const": "9:16"},
+      "fps": {"type": "integer", "minimum": 1},
+      "scenes": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": ["duration_seconds", "text", "visual"],
+          "properties": {
+            "duration_seconds": {"type": "integer", "minimum": 1},
+            "text": {"type": "string"},
+            "visual": {"type": "string"}
+          }
+        }
+      },
+      "caption": {"type": "string"}
+    }
+  },
+  "preview_asset": "preview.png",
+  "assets": []
 }

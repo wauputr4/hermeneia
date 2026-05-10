@@ -7,7 +7,64 @@ Templates are reusable media layouts that transform structured content into fina
 ```text
 templates/
 ├─ carousel/
+│  └─ ai-news-clean/
+│     └─ template.json
 └─ video/
+   └─ ai-news-short/
+      └─ template.json
+```
+
+Template IDs map directly to their built-in manifest paths:
+
+```text
+carousel/ai-news-clean -> templates/carousel/ai-news-clean/template.json
+video/ai-news-short    -> templates/video/ai-news-short/template.json
+```
+
+The built-in loader scans local `template.json` files deterministically and
+rejects duplicate IDs, missing required fields, unsupported content types, and
+ID/path mismatches.
+
+## Manifest Contract
+
+Hermeneia template manifests are JSON. Required fields:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | string | Stable template ID that maps to the manifest path. |
+| `name` | string | Human-readable template name. |
+| `content_type` | string | `carousel` or `short_video`. |
+| `description` | string | Short operational description. |
+| `version` | string | Template contract version. |
+| `aspect_ratio` | string | Output format such as `4:5` or `9:16`. |
+| `renderer` | string | Renderer implementation key. |
+| `output_kinds` | string array | Artifact kinds the template can produce. |
+| `input_schema` | object | JSON Schema-style description of renderer input. |
+
+Optional fields:
+
+- `preview_asset`
+- `assets`
+
+Example:
+
+```json
+{
+  "id": "carousel/ai-news-clean",
+  "name": "AI News Clean Carousel",
+  "content_type": "carousel",
+  "description": "A clean editorial carousel for AI news and explainers.",
+  "version": "1.0.0",
+  "aspect_ratio": "4:5",
+  "renderer": "go-png",
+  "output_kinds": ["content_json", "carousel_png", "caption_text"],
+  "input_schema": {
+    "type": "object",
+    "required": ["template", "slides", "caption", "hashtags"]
+  },
+  "preview_asset": "preview.png",
+  "assets": []
+}
 ```
 
 ## Carousel Template
@@ -91,7 +148,9 @@ Video input contract:
 
 Templates should receive structured JSON, not raw prompts.
 
-This keeps rendering deterministic and easier to revise.
+This keeps rendering deterministic and easier to revise. The manifest
+`input_schema` documents that structured payload for CLI, API, Web UI, and
+future custom template loaders.
 
 ## AI Image Generation
 

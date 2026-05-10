@@ -2,15 +2,40 @@
   "id": "carousel/ai-news-clean",
   "name": "AI News Clean Carousel",
   "content_type": "carousel",
+  "description": "A clean editorial carousel for AI news, explainers, and practical trend summaries.",
+  "version": "1.0.0",
+  "aspect_ratio": "4:5",
   "renderer": "go-png",
-  "slide_size": {
-    "width": 1080,
-    "height": 1350
-  },
-  "supported_slide_types": [
-    "cover",
-    "point",
-    "closing"
+  "output_kinds": [
+    "content_json",
+    "carousel_png",
+    "caption_text"
   ],
-  "output": "runs/{run-id}/output/carousel/slide-{n}.png"
+  "input_schema": {
+    "type": "object",
+    "required": ["template", "slides", "caption", "hashtags"],
+    "properties": {
+      "template": {"const": "carousel/ai-news-clean"},
+      "slides": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": ["type", "headline", "body"],
+          "properties": {
+            "type": {"enum": ["cover", "point", "closing"]},
+            "headline": {"type": "string"},
+            "body": {"type": "string"}
+          }
+        }
+      },
+      "caption": {"type": "string"},
+      "hashtags": {
+        "type": "array",
+        "items": {"type": "string"}
+      }
+    }
+  },
+  "preview_asset": "preview.png",
+  "assets": []
 }
