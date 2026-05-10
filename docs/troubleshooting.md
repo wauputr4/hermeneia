@@ -152,3 +152,14 @@ Important guardrails:
 - SQLite must not store OAuth tokens, API keys, refresh tokens, or account credentials.
 - Supported MVP platform names are `instagram`, `facebook`, `youtube`, `tiktok`, and `linkedin`.
 - Use future RFC3339 timestamps for `--at` and API `scheduled_at` values. Past timestamps are rejected before schedule rows are created.
+
+## 2026-05-10 — Template manifest loader
+
+Built-in templates are loaded from local `templates/**/template.json` manifests.
+
+Notes:
+
+- Template IDs must map directly to manifest paths, for example `carousel/ai-news-clean` must live at `templates/carousel/ai-news-clean/template.json`.
+- Required manifest fields are documented in `docs/templates.md`.
+- The loader rejects missing fields, duplicate IDs, unsupported content types, invalid `input_schema` JSON, and ID/path mismatches before content runs are created.
+- `hermeneia create` and `hermeneia research` use the catalog to select default built-in templates and reject templates whose `content_type` does not match the requested run type.

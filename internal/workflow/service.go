@@ -18,6 +18,7 @@ import (
 	"github.com/wauputr4/hermeneia/internal/render"
 	"github.com/wauputr4/hermeneia/internal/runfiles"
 	"github.com/wauputr4/hermeneia/internal/storage"
+	"github.com/wauputr4/hermeneia/internal/templates"
 )
 
 const (
@@ -50,13 +51,14 @@ type VideoRenderer interface {
 }
 
 type Service struct {
-	Repo     *storage.Repository
-	Files    runfiles.Store
-	Carousel CarouselRenderer
-	Video    VideoRenderer
-	Planner  ResearchPlanner
-	Now      func() time.Time
-	NewID    func(prefix, seed string) string
+	Repo      *storage.Repository
+	Files     runfiles.Store
+	Carousel  CarouselRenderer
+	Video     VideoRenderer
+	Planner   ResearchPlanner
+	Templates templates.Catalog
+	Now       func() time.Time
+	NewID     func(prefix, seed string) string
 }
 
 type CreateInput struct {
@@ -177,17 +179,19 @@ func (s Service) CreateRun(ctx context.Context, input CreateInput) (CreateResult
 	if strings.TrimSpace(input.Topic) == "" {
 		return CreateResult{}, invalidInput("topic is required")
 	}
-	templateID := strings.TrimSpace(input.TemplateID)
-	if templateID == "" {
-		templateID = defaultTemplate(contentType)
+	template, err := s.resolveTemplate(contentType, input.TemplateID)
+	if err != nil {
+		return CreateResult{}, err
 	}
+	templateID := template.ID
 
 	b := draftBrief(input, contentType, templateID)
-	return s.createRunWithBrief(ctx, input, contentType, templateID, b, fmt.Sprintf("- v1 created from topic %q.\n", b.Topic))
+	return s.createRunWithBrief(ctx, input, contentType, template, b, fmt.Sprintf("- v1 created from topic %q.\n", b.Topic))
 }
 
-func (s Service) createRunWithBrief(ctx context.Context, input CreateInput, contentType, templateID string, b brief.Brief, historyEntry string) (CreateResult, error) {
+func (s Service) createRunWithBrief(ctx context.Context, input CreateInput, contentType string, template templates.Manifest, b brief.Brief, historyEntry string) (CreateResult, error) {
 	runID := s.newID("run", input.Topic)
+	templateID := template.ID
 	if err := s.Files.PrepareRun(runID); err != nil {
 		return CreateResult{}, err
 	}
@@ -202,7 +206,7 @@ func (s Service) createRunWithBrief(ctx context.Context, input CreateInput, cont
 		return fail(err)
 	}
 
-	if err := s.Repo.EnsureTemplate(ctx, storage.Template{ID: templateID, Name: templateName(templateID), ContentType: contentType}); err != nil {
+	if err := s.Repo.EnsureTemplate(ctx, storage.Template{ID: templateID, Name: template.Name, ContentType: contentType}); err != nil {
 		return fail(err)
 	}
 	run := storage.ContentRun{ID: runID, Topic: b.Topic, ContentType: contentType, TemplateID: templateID}
@@ -259,10 +263,11 @@ func (s Service) CreateRunFromResearch(ctx context.Context, input ResearchInput)
 	if len(sources) == 0 {
 		return ResearchResult{}, invalidInput("at least one source URL is required")
 	}
-	templateID := strings.TrimSpace(input.TemplateID)
-	if templateID == "" {
-		templateID = defaultTemplate(contentType)
+	template, err := s.resolveTemplate(contentType, input.TemplateID)
+	if err != nil {
+		return ResearchResult{}, err
 	}
+	templateID := template.ID
 
 	createInput := CreateInput{
 		Topic:          input.Topic,
@@ -286,7 +291,7 @@ func (s Service) CreateRunFromResearch(ctx context.Context, input ResearchInput)
 		return ResearchResult{}, err
 	}
 	initialBrief := draftBriefFromResearch(createInput, plan)
-	created, err := s.createRunWithBrief(ctx, createInput, contentType, templateID, initialBrief, fmt.Sprintf("- v1 created from research topic %q.\n", strings.TrimSpace(input.Topic)))
+	created, err := s.createRunWithBrief(ctx, createInput, contentType, template, initialBrief, fmt.Sprintf("- v1 created from research topic %q.\n", strings.TrimSpace(input.Topic)))
 	if err != nil {
 		return ResearchResult{}, err
 	}
@@ -920,17 +925,30 @@ func normalizeContentType(value string) (string, error) {
 	}
 }
 
-func defaultTemplate(contentType string) string {
-	switch contentType {
-	case ContentTypeShortVideo:
-		return render.TemplateVideoAINewsShort
-	default:
-		return render.TemplateCarouselAINewsClean
+func (s Service) resolveTemplate(contentType, templateID string) (templates.Manifest, error) {
+	catalog := s.Templates
+	if len(catalog.All()) == 0 {
+		var err error
+		catalog, err = templates.LoadBuiltIn()
+		if err != nil {
+			return templates.Manifest{}, fmt.Errorf("load templates: %w", err)
+		}
 	}
-}
-
-func templateName(templateID string) string {
-	return strings.ReplaceAll(templateID, "/", " ")
+	templateID = strings.TrimSpace(templateID)
+	var manifest templates.Manifest
+	var err error
+	if templateID == "" {
+		manifest, err = catalog.Default(contentType)
+	} else {
+		manifest, err = catalog.Get(templateID)
+	}
+	if err != nil {
+		return templates.Manifest{}, invalidInput(err.Error())
+	}
+	if manifest.ContentType != contentType {
+		return templates.Manifest{}, invalidInput(fmt.Sprintf("template %q is for content type %q, not %q", manifest.ID, manifest.ContentType, contentType))
+	}
+	return manifest, nil
 }
 
 func rendererName(contentType string) string {
