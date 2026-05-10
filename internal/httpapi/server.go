@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -155,22 +156,9 @@ func (s *Server) handleListArtifacts(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleArtifactFile(w http.ResponseWriter, r *http.Request) {
 	runID := r.PathValue("runID")
 	artifactID := r.PathValue("artifactID")
-	artifactRows, err := s.service.ListArtifacts(r.Context(), runID)
+	artifact, err := s.service.GetArtifact(r.Context(), runID, artifactID)
 	if err != nil {
 		writeServiceError(w, err)
-		return
-	}
-	var artifact storage.Artifact
-	found := false
-	for _, row := range artifactRows {
-		if row.ID == artifactID {
-			artifact = row
-			found = true
-			break
-		}
-	}
-	if !found {
-		writeServiceError(w, sql.ErrNoRows)
 		return
 	}
 	path, err := s.safeArtifactPath(runID, artifact.Path)
@@ -186,14 +174,31 @@ func (s *Server) safeArtifactPath(runID, artifactPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	runDir, err = filepath.EvalSymlinks(runDir)
+	if err != nil {
+		return "", err
+	}
 	path, err := filepath.Abs(filepath.Clean(artifactPath))
 	if err != nil {
 		return "", err
 	}
-	if path != runDir && !strings.HasPrefix(path, runDir+string(filepath.Separator)) {
+	path, err = filepath.EvalSymlinks(path)
+	if err != nil {
+		return "", err
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", err
+	}
+	if info.IsDir() || !pathWithinDirectory(runDir, path) {
 		return "", workflow.ErrInvalidInput
 	}
 	return path, nil
+}
+
+func pathWithinDirectory(root, path string) bool {
+	relative, err := filepath.Rel(root, path)
+	return err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) && !filepath.IsAbs(relative)
 }
 
 func (s *Server) handleReviseRun(w http.ResponseWriter, r *http.Request) {
@@ -510,7 +515,7 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 }
 
 func writeServiceError(w http.ResponseWriter, err error) {
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) || errors.Is(err, os.ErrNotExist) {
 		writeError(w, http.StatusNotFound, err)
 		return
 	}

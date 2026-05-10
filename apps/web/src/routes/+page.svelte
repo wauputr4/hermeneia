@@ -265,14 +265,15 @@
 									<h4>{kind}</h4>
 									{#each artifacts as artifact}
 										{@const previewType = artifactPreviewType(artifact)}
+										{@const fileURL = artifactFileURL(artifact)}
 										<div class="artifact-card">
 											{#if previewType === 'image'}
-												<img src={artifactFileURL(artifact)} alt={artifact.path} loading="lazy" />
+												<img src={fileURL} alt={artifact.path} loading="lazy" />
 											{:else if previewType === 'video'}
-												<video src={artifactFileURL(artifact)} controls muted playsinline></video>
+												<video src={fileURL} controls muted playsinline></video>
 											{/if}
 											<p>
-												<a href={artifactFileURL(artifact)} target="_blank" rel="noreferrer">{artifact.path}</a>
+												<a href={fileURL} target="_blank" rel="noreferrer">{artifact.path}</a>
 												<small>{artifact.checksum || 'no checksum'}</small>
 											</p>
 										</div>

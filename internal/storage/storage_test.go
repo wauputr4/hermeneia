@@ -82,6 +82,16 @@ func TestMigrateAndRepositoryCreateRead(t *testing.T) {
 	if artifact.Path != "runs/run-1/output/slide-1.png" {
 		t.Fatalf("unexpected artifact: %#v", artifact)
 	}
+	runArtifact, err := repo.GetArtifactByRun(ctx, "run-1", "artifact-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runArtifact.ID != "artifact-1" || runArtifact.RunID != "run-1" {
+		t.Fatalf("unexpected artifact by run: %#v", runArtifact)
+	}
+	if _, err := repo.GetArtifactByRun(ctx, "run-missing", "artifact-1"); err != sql.ErrNoRows {
+		t.Fatalf("expected missing run/artifact lookup to return sql.ErrNoRows, got %v", err)
+	}
 	artifacts, err := repo.ListArtifactsByIDs(ctx, []string{"artifact-2", "artifact-1"})
 	if err != nil {
 		t.Fatal(err)

@@ -131,6 +131,44 @@ func TestServerContentRunWorkflow(t *testing.T) {
 	assertStatus(t, missing, http.StatusNotFound)
 }
 
+func TestServerRejectsArtifactFileSymlinkEscape(t *testing.T) {
+	ctx := context.Background()
+	service := newTestService(t)
+	runID := "run-symlink"
+	briefID := "brief-symlink"
+	if err := service.Repo.CreateContentRun(ctx, storage.ContentRun{ID: runID, Topic: "AI agents", ContentType: "carousel"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.Repo.CreateBriefVersion(ctx, storage.BriefVersion{ID: briefID, RunID: runID, Version: 1, BodyJSON: `{"topic":"AI agents"}`}); err != nil {
+		t.Fatal(err)
+	}
+	outputDir := filepath.Join(service.Files.RunDir(runID), "output")
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	outsidePath := filepath.Join(t.TempDir(), "outside.txt")
+	if err := os.WriteFile(outsidePath, []byte("outside secret"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifactPath := filepath.Join(outputDir, "slide-01.png")
+	if err := os.Symlink(outsidePath, artifactPath); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	if err := service.Repo.CreateArtifact(ctx, storage.Artifact{
+		ID:             "artifact-symlink",
+		RunID:          runID,
+		BriefVersionID: briefID,
+		Kind:           "carousel_png",
+		Path:           artifactPath,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	file := request(t, New(service), http.MethodGet, "/v1/runs/"+runID+"/artifacts/artifact-symlink/file", "")
+
+	assertStatus(t, file, http.StatusBadRequest)
+}
+
 func TestServerResearchRunAndValidation(t *testing.T) {
 	handler := newTestHandler(t)
 
@@ -220,6 +258,11 @@ func TestServerRejectsNonLoopbackCORSOrigin(t *testing.T) {
 
 func newTestHandler(t *testing.T) http.Handler {
 	t.Helper()
+	return New(newTestService(t))
+}
+
+func newTestService(t *testing.T) workflow.Service {
+	t.Helper()
 	db, err := storage.Open(filepath.Join(t.TempDir(), "hermeneia.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -239,7 +282,7 @@ func newTestHandler(t *testing.T) http.Handler {
 		return fmt.Sprintf("%s-%d", prefix, ids)
 	}
 	service.Carousel = fakeCarouselRenderer{}
-	return New(service)
+	return service
 }
 
 type fakeCarouselRenderer struct{}
