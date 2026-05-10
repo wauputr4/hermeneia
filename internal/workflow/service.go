@@ -378,6 +378,18 @@ func (s Service) ListArtifacts(ctx context.Context, runID string) ([]storage.Art
 	return s.Repo.ListArtifactsByRun(ctx, runID)
 }
 
+func (s Service) GetArtifact(ctx context.Context, runID, artifactID string) (storage.Artifact, error) {
+	runID = strings.TrimSpace(runID)
+	artifactID = strings.TrimSpace(artifactID)
+	if runID == "" {
+		return storage.Artifact{}, invalidInput("run id is required")
+	}
+	if artifactID == "" {
+		return storage.Artifact{}, invalidInput("artifact id is required")
+	}
+	return s.Repo.GetArtifactByRun(ctx, runID, artifactID)
+}
+
 func (s Service) DeleteRun(ctx context.Context, runID string) error {
 	runID = strings.TrimSpace(runID)
 	if runID == "" {

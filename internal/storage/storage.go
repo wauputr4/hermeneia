@@ -235,6 +235,18 @@ func (r *Repository) GetArtifact(ctx context.Context, id string) (Artifact, erro
 	}
 	return a, err
 }
+func (r *Repository) GetArtifactByRun(ctx context.Context, runID, id string) (Artifact, error) {
+	var a Artifact
+	var bvid, checksum sql.NullString
+	err := r.db.QueryRowContext(ctx, `SELECT id, run_id, brief_version_id, kind, path, checksum, created_at FROM artifacts WHERE run_id = ? AND id = ?`, runID, id).Scan(&a.ID, &a.RunID, &bvid, &a.Kind, &a.Path, &checksum, &a.CreatedAt)
+	if bvid.Valid {
+		a.BriefVersionID = bvid.String
+	}
+	if checksum.Valid {
+		a.Checksum = checksum.String
+	}
+	return a, err
+}
 func (r *Repository) ListArtifactsByIDs(ctx context.Context, ids []string) ([]Artifact, error) {
 	if len(ids) == 0 {
 		return nil, nil

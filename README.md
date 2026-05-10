@@ -115,13 +115,13 @@ go run ./cmd/hermeneia show <run-id>
 Web UI development:
 
 ```bash
-go run ./cmd/hermeneia serve --addr 127.0.0.1:19317
+go run ./cmd/hermeneia serve --addr 127.0.0.1:19318
 cd apps/web
 npm install
 npm run dev
 ```
 
-The SvelteKit app reads the local Go API from `PUBLIC_HERMENEIA_API_BASE` and defaults to `http://127.0.0.1:19317`. The first UI slice supports run creation, run detail review, brief version inspection, revision instructions, and render/export triggering.
+The SvelteKit app reads the local Go API from `PUBLIC_HERMENEIA_API_BASE` and defaults to `http://127.0.0.1:19318`. The first UI slice supports run creation, run detail review, brief version inspection, revision instructions, render/export triggering, and artifact previews.
 
 By default, `hermeneia init` creates or migrates `data/hermeneia.db`. To use an isolated database path:
 

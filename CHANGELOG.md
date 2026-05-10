@@ -11,7 +11,7 @@ All notable changes to Hermeneia are documented here.
 - Inspectable run folders under `runs/{run-id}/` with brief JSON, research JSON, history, render input, captions, and exported assets.
 - Deterministic carousel rendering for `carousel/ai-news-clean`.
 - Local short-video MP4 render path for `video/ai-news-short`.
-- Local JSON HTTP API on `127.0.0.1:19317` for agent and future UI workflows.
+- Local JSON HTTP API on `127.0.0.1:19318` for agent and future UI workflows.
 - Optional OpenAI Responses API research planner behind explicit `--planner openai` or API `planner: "openai"`.
 - Open-source project hygiene: license, contribution guide, security policy, code of conduct, ADRs, MVP docs, API docs, and release process.
 

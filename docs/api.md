@@ -7,7 +7,7 @@ workflow service used by the CLI.
 Run it locally with:
 
 ```bash
-hermeneia serve --addr 127.0.0.1:19317
+hermeneia serve --addr 127.0.0.1:19318
 ```
 
 The server uses the same configuration as the CLI:
@@ -142,6 +142,16 @@ GET /v1/runs/{run_id}/artifacts
 ```
 
 Returns artifact rows for the run.
+
+### Download Artifact File
+
+```http
+GET /v1/runs/{run_id}/artifacts/{artifact_id}/file
+```
+
+Streams the artifact file bytes from the local run folder. This endpoint is
+intended for local Web UI previews and only serves files already registered as
+artifacts for the requested run.
 
 ### Revise Run
 

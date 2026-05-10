@@ -16,6 +16,17 @@ export function artifactGroups(artifacts) {
 	}, new Map());
 }
 
+export function artifactPreviewType(artifact) {
+	const path = artifact.path?.toLowerCase() ?? '';
+	if (artifact.kind === 'carousel_png' || path.endsWith('.png')) {
+		return 'image';
+	}
+	if (artifact.kind === 'video_mp4' || path.endsWith('.mp4')) {
+		return 'video';
+	}
+	return null;
+}
+
 export function runSummary(run, details) {
 	const latest = details ? latestBrief(details.briefs) : null;
 	const artifactCount = details ? details.artifacts.length : 0;

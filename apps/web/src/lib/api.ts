@@ -1,6 +1,6 @@
 import { env } from '$env/dynamic/public';
 
-const DEFAULT_API_BASE = 'http://127.0.0.1:19317';
+const DEFAULT_API_BASE = 'http://127.0.0.1:19318';
 
 export type ContentRun = {
 	id: string;
@@ -126,4 +126,8 @@ export function renderRun(runID: string): Promise<{ artifacts: Artifact[] }> {
 	return request(`/v1/runs/${encodeURIComponent(runID)}/render`, {
 		method: 'POST'
 	});
+}
+
+export function artifactFileURL(artifact: Artifact): string {
+	return `${apiBase()}/v1/runs/${encodeURIComponent(artifact.run_id)}/artifacts/${encodeURIComponent(artifact.id)}/file`;
 }

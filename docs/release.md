@@ -74,9 +74,9 @@ Start the local API:
 In another terminal:
 
 ```bash
-curl -sS http://127.0.0.1:19317/health
-curl -sS http://127.0.0.1:19317/v1/runs
-curl -sS -X POST http://127.0.0.1:19317/v1/runs \
+curl -sS http://127.0.0.1:19318/health
+curl -sS http://127.0.0.1:19318/v1/runs
+curl -sS -X POST http://127.0.0.1:19318/v1/runs \
   -H "Content-Type: application/json" \
   --data '{"topic":"Release smoke","content_type":"carousel"}'
 ```

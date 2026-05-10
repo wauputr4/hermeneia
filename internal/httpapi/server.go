@@ -7,6 +7,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/wauputr4/hermeneia/internal/storage"
@@ -43,6 +46,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /v1/runs/{runID}", s.handleDeleteRun)
 	s.mux.HandleFunc("GET /v1/runs/{runID}/briefs", s.handleListBriefs)
 	s.mux.HandleFunc("GET /v1/runs/{runID}/artifacts", s.handleListArtifacts)
+	s.mux.HandleFunc("GET /v1/runs/{runID}/artifacts/{artifactID}/file", s.handleArtifactFile)
 	s.mux.HandleFunc("POST /v1/runs/{runID}/revisions", s.handleReviseRun)
 	s.mux.HandleFunc("POST /v1/runs/{runID}/render", s.handleRenderRun)
 	s.mux.HandleFunc("POST /v1/runs/{runID}/schedule", s.handleSchedulePost)
@@ -147,6 +151,54 @@ func (s *Server) handleListArtifacts(w http.ResponseWriter, r *http.Request) {
 		artifacts = append(artifacts, newArtifactResponse(artifact))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"artifacts": artifacts})
+}
+
+func (s *Server) handleArtifactFile(w http.ResponseWriter, r *http.Request) {
+	runID := r.PathValue("runID")
+	artifactID := r.PathValue("artifactID")
+	artifact, err := s.service.GetArtifact(r.Context(), runID, artifactID)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	path, err := s.safeArtifactPath(runID, artifact.Path)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	http.ServeFile(w, r, path)
+}
+
+func (s *Server) safeArtifactPath(runID, artifactPath string) (string, error) {
+	runDir, err := filepath.Abs(s.service.Files.RunDir(runID))
+	if err != nil {
+		return "", err
+	}
+	runDir, err = filepath.EvalSymlinks(runDir)
+	if err != nil {
+		return "", err
+	}
+	path, err := filepath.Abs(filepath.Clean(artifactPath))
+	if err != nil {
+		return "", err
+	}
+	path, err = filepath.EvalSymlinks(path)
+	if err != nil {
+		return "", err
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", err
+	}
+	if info.IsDir() || !pathWithinDirectory(runDir, path) {
+		return "", workflow.ErrInvalidInput
+	}
+	return path, nil
+}
+
+func pathWithinDirectory(root, path string) bool {
+	relative, err := filepath.Rel(root, path)
+	return err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) && !filepath.IsAbs(relative)
 }
 
 func (s *Server) handleReviseRun(w http.ResponseWriter, r *http.Request) {
@@ -463,7 +515,7 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 }
 
 func writeServiceError(w http.ResponseWriter, err error) {
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) || errors.Is(err, os.ErrNotExist) {
 		writeError(w, http.StatusNotFound, err)
 		return
 	}

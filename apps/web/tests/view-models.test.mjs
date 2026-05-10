@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import {
 	artifactGroups,
+	artifactPreviewType,
 	formatShortDate,
 	latestBrief,
 	runSummary,
@@ -34,6 +35,12 @@ describe('web view model helpers', () => {
 				['caption', ['caption.txt']]
 			]
 		);
+	});
+
+	it('detects previewable artifact media types', () => {
+		assert.equal(artifactPreviewType({ kind: 'carousel_png', path: 'runs/run-1/output/slide-01.png' }), 'image');
+		assert.equal(artifactPreviewType({ kind: 'video_mp4', path: 'runs/run-1/output/video.mp4' }), 'video');
+		assert.equal(artifactPreviewType({ kind: 'content_json', path: 'runs/run-1/content.json' }), null);
 	});
 
 	it('builds dashboard summary counters from loaded details', () => {

@@ -257,7 +257,7 @@ func (c command) schedules(ctx context.Context, args []string) error {
 
 func (c command) serve(ctx context.Context, args []string) error {
 	fs := c.flagSet("serve")
-	addr := fs.String("addr", "127.0.0.1:19317", "HTTP listen address")
+	addr := fs.String("addr", "127.0.0.1:19318", "HTTP listen address")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -548,5 +548,5 @@ Examples:
   hermeneia revise <run-id> --instruction "Make the hook sharper"
   hermeneia render <run-id>
   hermeneia schedule <run-id> --platform instagram --at 2026-05-10T02:00:00Z
-  hermeneia serve --addr 127.0.0.1:19317`)
+  hermeneia serve --addr 127.0.0.1:19318`)
 }

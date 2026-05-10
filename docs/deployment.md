@@ -46,13 +46,13 @@ export HERMENEIA_DATABASE_PATH="$PWD/data/hermeneia.db"
 Default address:
 
 ```text
-127.0.0.1:19317
+127.0.0.1:19318
 ```
 
 Health check:
 
 ```bash
-curl -sS http://127.0.0.1:19317/health
+curl -sS http://127.0.0.1:19318/health
 ```
 
 ## Process Manager Example
