@@ -184,9 +184,9 @@ Request:
 }
 ```
 
-Returns `201 Created` with a scheduled publishing record. The MVP stores
-status and validation metadata only; platform credentials remain external and
-are not stored in SQLite.
+Returns `201 Created` with a scheduled publishing record. `scheduled_at` must be
+a future RFC3339 timestamp. The MVP stores status and validation metadata only;
+platform credentials remain external and are not stored in SQLite.
 
 ### List Scheduled Posts
 

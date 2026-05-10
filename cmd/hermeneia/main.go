@@ -472,66 +472,38 @@ func parseResearchArgs(args []string) (workflow.ResearchInput, error) {
 
 func parseScheduleArgs(args []string) (workflow.ScheduleInput, error) {
 	var input workflow.ScheduleInput
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		if value, ok := strings.CutPrefix(arg, "--run="); ok {
-			input.RunID = value
-			continue
+	positionalRunID := ""
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		positionalRunID = args[0]
+		args = args[1:]
+	}
+	fs := flag.NewFlagSet("schedule", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	fs.StringVar(&input.RunID, "run", "", "run id")
+	fs.StringVar(&input.Platform, "platform", "", "publishing platform")
+	fs.StringVar(&input.ArtifactID, "artifact", "", "artifact id")
+	var at string
+	fs.StringVar(&at, "at", "", "scheduled time in RFC3339")
+	if err := fs.Parse(args); err != nil {
+		return input, err
+	}
+	if at != "" {
+		parsed, err := time.Parse(time.RFC3339, at)
+		if err != nil {
+			return input, fmt.Errorf("--at must be RFC3339: %w", err)
 		}
-		if value, ok := strings.CutPrefix(arg, "--platform="); ok {
-			input.Platform = value
-			continue
-		}
-		if value, ok := strings.CutPrefix(arg, "--artifact="); ok {
-			input.ArtifactID = value
-			continue
-		}
-		if value, ok := strings.CutPrefix(arg, "--at="); ok {
-			at, err := time.Parse(time.RFC3339, value)
-			if err != nil {
-				return input, fmt.Errorf("--at must be RFC3339: %w", err)
-			}
-			input.ScheduledAt = at
-			continue
-		}
-		switch arg {
-		case "--run":
-			i++
-			if i >= len(args) {
-				return input, errors.New("--run requires a value")
-			}
-			input.RunID = args[i]
-		case "--platform":
-			i++
-			if i >= len(args) {
-				return input, errors.New("--platform requires a value")
-			}
-			input.Platform = args[i]
-		case "--artifact":
-			i++
-			if i >= len(args) {
-				return input, errors.New("--artifact requires a value")
-			}
-			input.ArtifactID = args[i]
-		case "--at":
-			i++
-			if i >= len(args) {
-				return input, errors.New("--at requires a value")
-			}
-			at, err := time.Parse(time.RFC3339, args[i])
-			if err != nil {
-				return input, fmt.Errorf("--at must be RFC3339: %w", err)
-			}
-			input.ScheduledAt = at
-		default:
-			if strings.HasPrefix(arg, "-") {
-				return input, fmt.Errorf("unknown flag %q", arg)
-			}
-			if input.RunID != "" {
-				return input, fmt.Errorf("unexpected argument %q", arg)
-			}
-			input.RunID = arg
-		}
+		input.ScheduledAt = parsed
+	}
+	if input.RunID == "" {
+		input.RunID = positionalRunID
+	}
+	if input.RunID == "" && fs.NArg() > 0 {
+		input.RunID = fs.Arg(0)
+	} else if positionalRunID != "" && fs.NArg() > 0 {
+		return input, fmt.Errorf("unexpected argument %q", fs.Arg(0))
+	}
+	if fs.NArg() > 1 {
+		return input, fmt.Errorf("unexpected argument %q", fs.Arg(1))
 	}
 	return input, nil
 }

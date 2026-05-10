@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -94,6 +95,17 @@ func TestServiceCreateReviseAndRenderCarouselRun(t *testing.T) {
 	}
 	if !strings.Contains(scheduled.Post.ValidationJSON, `"credentials_stored_in_db":false`) {
 		t.Fatalf("validation must not store credentials: %s", scheduled.Post.ValidationJSON)
+	}
+	_, err = service.SchedulePost(ctx, ScheduleInput{
+		RunID:       created.Run.ID,
+		Platform:    "instagram",
+		ScheduledAt: time.Date(2026, 5, 9, 6, 59, 0, 0, time.UTC),
+	})
+	if err == nil {
+		t.Fatal("expected past schedule timestamp to be rejected")
+	}
+	if !errors.Is(err, ErrInvalidInput) || !strings.Contains(err.Error(), "future") {
+		t.Fatalf("unexpected schedule error: %v", err)
 	}
 
 	details, err := service.ShowRun(ctx, created.Run.ID)

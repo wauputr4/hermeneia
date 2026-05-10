@@ -151,4 +151,4 @@ Important guardrails:
 - SQLite stores schedule status, platform name, selected artifact id, and validation metadata.
 - SQLite must not store OAuth tokens, API keys, refresh tokens, or account credentials.
 - Supported MVP platform names are `instagram`, `facebook`, `youtube`, `tiktok`, and `linkedin`.
-- Use RFC3339 timestamps for `--at` and API `scheduled_at` values.
+- Use future RFC3339 timestamps for `--at` and API `scheduled_at` values. Past timestamps are rejected before schedule rows are created.

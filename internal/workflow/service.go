@@ -558,6 +558,10 @@ func (s Service) SchedulePost(ctx context.Context, input ScheduleInput) (Schedul
 	if input.ScheduledAt.IsZero() {
 		return ScheduleResult{}, invalidInput("scheduled_at is required")
 	}
+	scheduledAt := input.ScheduledAt.UTC()
+	if !scheduledAt.After(s.now().UTC()) {
+		return ScheduleResult{}, invalidInput("scheduled_at must be in the future")
+	}
 	run, err := s.Repo.GetContentRun(ctx, runID)
 	if err != nil {
 		return ScheduleResult{}, err
@@ -578,7 +582,7 @@ func (s Service) SchedulePost(ctx context.Context, input ScheduleInput) (Schedul
 		RunID:          runID,
 		ArtifactID:     artifactID,
 		Platform:       platform,
-		ScheduledAt:    input.ScheduledAt.UTC(),
+		ScheduledAt:    scheduledAt,
 		Status:         "scheduled",
 		ValidationJSON: validation,
 	}

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/wauputr4/hermeneia/internal/workflow"
 )
@@ -178,6 +179,7 @@ func TestCLIContentRunWorkflow(t *testing.T) {
 	cmd := command{
 		stdout:   &stdout,
 		runsRoot: runsRoot,
+		now:      func() time.Time { return time.Date(2026, 5, 9, 7, 0, 0, 0, time.UTC) },
 		newID: func(prefix, seed string) string {
 			if prefix == "run" {
 				return "run-cli"
@@ -227,10 +229,18 @@ func TestCLIContentRunWorkflow(t *testing.T) {
 	}
 
 	stdout.Reset()
+	if err := cmd.run(ctx, []string{"schedule", "--run=run-cli", "--platform=linkedin", "--at=2026-05-10T03:00:00Z"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "scheduled linkedin post") {
+		t.Fatalf("unexpected schedule output:\n%s", stdout.String())
+	}
+
+	stdout.Reset()
 	if err := cmd.run(ctx, []string{"schedules"}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(stdout.String(), "instagram") || !strings.Contains(stdout.String(), "scheduled") {
+	if !strings.Contains(stdout.String(), "instagram") || !strings.Contains(stdout.String(), "linkedin") || !strings.Contains(stdout.String(), "scheduled") {
 		t.Fatalf("unexpected schedules output:\n%s", stdout.String())
 	}
 
