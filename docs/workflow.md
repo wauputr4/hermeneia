@@ -185,7 +185,18 @@ Supported MVP exports:
 
 ## 8. Schedule / Publish
 
-Later integrations:
+The first scheduling slice records future publishing slots and status tracking
+without calling external social APIs. It rejects past schedule timestamps,
+validates known platform names, and stores schedule metadata in SQLite, but
+platform credentials must remain in secret managers or platform connectors
+outside the Hermeneia database.
+
+```bash
+hermeneia schedule <run-id> --platform instagram --at 2026-05-10T02:00:00Z
+hermeneia schedules
+```
+
+Supported planned platforms:
 
 - Meta / Instagram / Facebook,
 - YouTube,

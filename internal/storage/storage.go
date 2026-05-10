@@ -14,7 +14,7 @@ import (
 )
 
 const DefaultDatabasePath = "data/hermeneia.db"
-const schemaVersion = 1
+const schemaVersion = 2
 
 func DatabasePathFromEnv() string {
 	if path := os.Getenv("HERMENEIA_DATABASE_PATH"); path != "" {
@@ -74,7 +74,15 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 		if _, err := tx.ExecContext(ctx, schemaV1SQL); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations(version) VALUES (?)`, schemaVersion); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations(version) VALUES (?)`, 1); err != nil {
+			return err
+		}
+	}
+	if currentVersion < 2 {
+		if _, err := tx.ExecContext(ctx, schemaV2SQL); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations(version) VALUES (?)`, 2); err != nil {
 			return err
 		}
 	}
@@ -119,6 +127,10 @@ type RevisionEvent struct {
 type Template struct {
 	ID, Name, ContentType string
 	CreatedAt             time.Time
+}
+type ScheduledPost struct {
+	ID, RunID, ArtifactID, Platform, Status, ValidationJSON string
+	ScheduledAt, CreatedAt, UpdatedAt                       time.Time
 }
 
 type Repository struct{ db *sql.DB }
@@ -331,6 +343,51 @@ func (r *Repository) ListRevisionEventsByRun(ctx context.Context, runID string) 
 	}
 	return events, rows.Err()
 }
+func (r *Repository) CreateScheduledPost(ctx context.Context, post ScheduledPost) error {
+	_, err := r.db.ExecContext(ctx, `INSERT INTO scheduled_posts (id, run_id, artifact_id, platform, scheduled_at, status, validation_json) VALUES (?, ?, ?, ?, ?, ?, ?)`, post.ID, post.RunID, nullIfEmpty(post.ArtifactID), post.Platform, post.ScheduledAt, post.Status, nullIfEmpty(post.ValidationJSON))
+	return err
+}
+func (r *Repository) GetScheduledPost(ctx context.Context, id string) (ScheduledPost, error) {
+	var post ScheduledPost
+	var artifactID, validation sql.NullString
+	err := r.db.QueryRowContext(ctx, `SELECT id, run_id, artifact_id, platform, scheduled_at, status, validation_json, created_at, updated_at FROM scheduled_posts WHERE id = ?`, id).Scan(&post.ID, &post.RunID, &artifactID, &post.Platform, &post.ScheduledAt, &post.Status, &validation, &post.CreatedAt, &post.UpdatedAt)
+	if artifactID.Valid {
+		post.ArtifactID = artifactID.String
+	}
+	if validation.Valid {
+		post.ValidationJSON = validation.String
+	}
+	return post, err
+}
+func (r *Repository) ListScheduledPosts(ctx context.Context) ([]ScheduledPost, error) {
+	return r.listScheduledPosts(ctx, `SELECT id, run_id, artifact_id, platform, scheduled_at, status, validation_json, created_at, updated_at FROM scheduled_posts ORDER BY scheduled_at ASC, id ASC`)
+}
+func (r *Repository) ListScheduledPostsByRun(ctx context.Context, runID string) ([]ScheduledPost, error) {
+	return r.listScheduledPosts(ctx, `SELECT id, run_id, artifact_id, platform, scheduled_at, status, validation_json, created_at, updated_at FROM scheduled_posts WHERE run_id = ? ORDER BY scheduled_at ASC, id ASC`, runID)
+}
+func (r *Repository) listScheduledPosts(ctx context.Context, query string, args ...any) ([]ScheduledPost, error) {
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var posts []ScheduledPost
+	for rows.Next() {
+		var post ScheduledPost
+		var artifactID, validation sql.NullString
+		if err := rows.Scan(&post.ID, &post.RunID, &artifactID, &post.Platform, &post.ScheduledAt, &post.Status, &validation, &post.CreatedAt, &post.UpdatedAt); err != nil {
+			return nil, err
+		}
+		if artifactID.Valid {
+			post.ArtifactID = artifactID.String
+		}
+		if validation.Valid {
+			post.ValidationJSON = validation.String
+		}
+		posts = append(posts, post)
+	}
+	return posts, rows.Err()
+}
 func nullIfEmpty(s string) any {
 	if s == "" {
 		return nil
@@ -355,4 +412,18 @@ CREATE TABLE IF NOT EXISTS brief_versions (id TEXT PRIMARY KEY, run_id TEXT NOT 
 CREATE TABLE IF NOT EXISTS render_jobs (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES content_runs(id) ON DELETE CASCADE, status TEXT NOT NULL, renderer TEXT NOT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, completed_at DATETIME);
 CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES content_runs(id) ON DELETE CASCADE, brief_version_id TEXT REFERENCES brief_versions(id), kind TEXT NOT NULL, path TEXT NOT NULL, checksum TEXT, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS revision_events (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES content_runs(id) ON DELETE CASCADE, from_brief_version_id TEXT NOT NULL REFERENCES brief_versions(id), to_brief_version_id TEXT NOT NULL REFERENCES brief_versions(id), instruction TEXT NOT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP);
+`
+
+const schemaV2SQL = `
+CREATE TABLE IF NOT EXISTS scheduled_posts (
+	id TEXT PRIMARY KEY,
+	run_id TEXT NOT NULL REFERENCES content_runs(id) ON DELETE CASCADE,
+	artifact_id TEXT REFERENCES artifacts(id),
+	platform TEXT NOT NULL,
+	scheduled_at DATETIME NOT NULL,
+	status TEXT NOT NULL CHECK (status IN ('scheduled', 'publishing', 'published', 'failed', 'cancelled')),
+	validation_json TEXT CHECK (validation_json IS NULL OR json_valid(validation_json)),
+	created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 `

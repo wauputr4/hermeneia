@@ -116,7 +116,7 @@ server process.
 GET /v1/runs/{run_id}
 ```
 
-Returns the run, brief versions, revision events, and artifact metadata.
+Returns the run, brief versions, revision events, artifact metadata, and scheduled publishing records.
 
 ### Delete Run
 
@@ -167,3 +167,31 @@ POST /v1/runs/{run_id}/render
 
 Renders the latest brief version using the run's content type and template.
 Returns `201 Created` with structured content and created artifact metadata.
+
+### Schedule Post
+
+```http
+POST /v1/runs/{run_id}/schedule
+```
+
+Request:
+
+```json
+{
+  "platform": "instagram",
+  "artifact_id": "artifact-123",
+  "scheduled_at": "2026-05-10T02:00:00Z"
+}
+```
+
+Returns `201 Created` with a scheduled publishing record. `scheduled_at` must be
+a future RFC3339 timestamp. The MVP stores status and validation metadata only;
+platform credentials remain external and are not stored in SQLite.
+
+### List Scheduled Posts
+
+```http
+GET /v1/scheduled-posts
+```
+
+Returns scheduled publishing records ordered by `scheduled_at`.

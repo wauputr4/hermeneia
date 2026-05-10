@@ -45,6 +45,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/runs/{runID}/artifacts", s.handleListArtifacts)
 	s.mux.HandleFunc("POST /v1/runs/{runID}/revisions", s.handleReviseRun)
 	s.mux.HandleFunc("POST /v1/runs/{runID}/render", s.handleRenderRun)
+	s.mux.HandleFunc("POST /v1/runs/{runID}/schedule", s.handleSchedulePost)
+	s.mux.HandleFunc("GET /v1/scheduled-posts", s.handleListScheduledPosts)
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -183,6 +185,35 @@ func (s *Server) handleRenderRun(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleSchedulePost(w http.ResponseWriter, r *http.Request) {
+	var req schedulePostRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.service.SchedulePost(r.Context(), req.toInput(r.PathValue("runID")))
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, schedulePostResponse{
+		Run:  newRunResponse(result.Run),
+		Post: newScheduledPostResponse(result.Post),
+	})
+}
+
+func (s *Server) handleListScheduledPosts(w http.ResponseWriter, r *http.Request) {
+	posts, err := s.service.ListScheduledPosts(r.Context())
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	out := make([]scheduledPostResponse, 0, len(posts))
+	for _, post := range posts {
+		out = append(out, newScheduledPostResponse(post))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"scheduled_posts": out})
+}
+
 type createRunRequest struct {
 	Topic          string `json:"topic"`
 	ContentType    string `json:"content_type"`
@@ -227,6 +258,21 @@ type reviseRunRequest struct {
 	Instruction string `json:"instruction"`
 }
 
+type schedulePostRequest struct {
+	ArtifactID  string    `json:"artifact_id"`
+	Platform    string    `json:"platform"`
+	ScheduledAt time.Time `json:"scheduled_at"`
+}
+
+func (r schedulePostRequest) toInput(runID string) workflow.ScheduleInput {
+	return workflow.ScheduleInput{
+		RunID:       runID,
+		ArtifactID:  r.ArtifactID,
+		Platform:    r.Platform,
+		ScheduledAt: r.ScheduledAt,
+	}
+}
+
 type createRunResponse struct {
 	Run         runResponse   `json:"run"`
 	Brief       briefResponse `json:"brief"`
@@ -254,11 +300,17 @@ type renderRunResponse struct {
 	Artifacts []artifactResponse `json:"artifacts"`
 }
 
+type schedulePostResponse struct {
+	Run  runResponse           `json:"run"`
+	Post scheduledPostResponse `json:"scheduled_post"`
+}
+
 type runDetailsResponse struct {
-	Run       runResponse        `json:"run"`
-	Briefs    []briefResponse    `json:"briefs"`
-	Revisions []revisionResponse `json:"revisions"`
-	Artifacts []artifactResponse `json:"artifacts"`
+	Run       runResponse             `json:"run"`
+	Briefs    []briefResponse         `json:"briefs"`
+	Revisions []revisionResponse      `json:"revisions"`
+	Artifacts []artifactResponse      `json:"artifacts"`
+	Schedules []scheduledPostResponse `json:"scheduled_posts"`
 }
 
 func newRunDetailsResponse(details workflow.RunDetails) runDetailsResponse {
@@ -274,11 +326,16 @@ func newRunDetailsResponse(details workflow.RunDetails) runDetailsResponse {
 	for _, artifact := range details.Artifacts {
 		artifacts = append(artifacts, newArtifactResponse(artifact))
 	}
+	schedules := make([]scheduledPostResponse, 0, len(details.Schedules))
+	for _, schedule := range details.Schedules {
+		schedules = append(schedules, newScheduledPostResponse(schedule))
+	}
 	return runDetailsResponse{
 		Run:       newRunResponse(details.Run),
 		Briefs:    briefs,
 		Revisions: revisions,
 		Artifacts: artifacts,
+		Schedules: schedules,
 	}
 }
 
@@ -357,6 +414,36 @@ func newRevisionResponse(revision storage.RevisionEvent) revisionResponse {
 		ToBriefVersionID:   revision.ToBriefVersionID,
 		Instruction:        revision.Instruction,
 		CreatedAt:          revision.CreatedAt,
+	}
+}
+
+type scheduledPostResponse struct {
+	ID          string          `json:"id"`
+	RunID       string          `json:"run_id"`
+	ArtifactID  string          `json:"artifact_id,omitempty"`
+	Platform    string          `json:"platform"`
+	ScheduledAt time.Time       `json:"scheduled_at"`
+	Status      string          `json:"status"`
+	Validation  json.RawMessage `json:"validation"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
+}
+
+func newScheduledPostResponse(post storage.ScheduledPost) scheduledPostResponse {
+	validation := json.RawMessage(`{}`)
+	if post.ValidationJSON != "" {
+		validation = json.RawMessage(post.ValidationJSON)
+	}
+	return scheduledPostResponse{
+		ID:          post.ID,
+		RunID:       post.RunID,
+		ArtifactID:  post.ArtifactID,
+		Platform:    post.Platform,
+		ScheduledAt: post.ScheduledAt,
+		Status:      post.Status,
+		Validation:  validation,
+		CreatedAt:   post.CreatedAt,
+		UpdatedAt:   post.UpdatedAt,
 	}
 }
 

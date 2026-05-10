@@ -78,6 +78,10 @@ func (c command) run(ctx context.Context, args []string) error {
 		return c.revise(ctx, args[1:])
 	case "render":
 		return c.render(ctx, args[1:])
+	case "schedule":
+		return c.schedule(ctx, args[1:])
+	case "schedules":
+		return c.schedules(ctx, args[1:])
 	case "serve":
 		return c.serve(ctx, args[1:])
 	default:
@@ -205,6 +209,47 @@ func (c command) render(ctx context.Context, args []string) error {
 		w := tabwriter.NewWriter(c.stdout, 0, 0, 2, ' ', 0)
 		for _, artifact := range result.Artifacts {
 			fmt.Fprintf(w, "-\t%s\t%s\n", artifact.Kind, artifact.Path)
+		}
+		return w.Flush()
+	})
+}
+
+func (c command) schedule(ctx context.Context, args []string) error {
+	input, err := parseScheduleArgs(args)
+	if err != nil {
+		return err
+	}
+	return c.withService(ctx, func(s workflow.Service) error {
+		result, err := s.SchedulePost(ctx, input)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(c.stdout, "scheduled %s post %s for run %s at %s\n", result.Post.Platform, result.Post.ID, result.Run.ID, result.Post.ScheduledAt.Format(time.RFC3339))
+		return nil
+	})
+}
+
+func (c command) schedules(ctx context.Context, args []string) error {
+	fs := c.flagSet("schedules")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() > 0 {
+		return fmt.Errorf("schedules does not accept positional arguments")
+	}
+	return c.withService(ctx, func(s workflow.Service) error {
+		posts, err := s.ListScheduledPosts(ctx)
+		if err != nil {
+			return err
+		}
+		if len(posts) == 0 {
+			fmt.Fprintln(c.stdout, "no scheduled posts found")
+			return nil
+		}
+		w := tabwriter.NewWriter(c.stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "SCHEDULE ID\tRUN ID\tPLATFORM\tSTATUS\tSCHEDULED AT")
+		for _, post := range posts {
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", post.ID, post.RunID, post.Platform, post.Status, post.ScheduledAt.Format(time.RFC3339))
 		}
 		return w.Flush()
 	})
@@ -425,6 +470,44 @@ func parseResearchArgs(args []string) (workflow.ResearchInput, error) {
 	return input, nil
 }
 
+func parseScheduleArgs(args []string) (workflow.ScheduleInput, error) {
+	var input workflow.ScheduleInput
+	positionalRunID := ""
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		positionalRunID = args[0]
+		args = args[1:]
+	}
+	fs := flag.NewFlagSet("schedule", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	fs.StringVar(&input.RunID, "run", "", "run id")
+	fs.StringVar(&input.Platform, "platform", "", "publishing platform")
+	fs.StringVar(&input.ArtifactID, "artifact", "", "artifact id")
+	var at string
+	fs.StringVar(&at, "at", "", "scheduled time in RFC3339")
+	if err := fs.Parse(args); err != nil {
+		return input, err
+	}
+	if at != "" {
+		parsed, err := time.Parse(time.RFC3339, at)
+		if err != nil {
+			return input, fmt.Errorf("--at must be RFC3339: %w", err)
+		}
+		input.ScheduledAt = parsed
+	}
+	if input.RunID == "" {
+		input.RunID = positionalRunID
+	}
+	if input.RunID == "" && fs.NArg() > 0 {
+		input.RunID = fs.Arg(0)
+	} else if positionalRunID != "" && fs.NArg() > 0 {
+		return input, fmt.Errorf("unexpected argument %q", fs.Arg(0))
+	}
+	if fs.NArg() > 1 {
+		return input, fmt.Errorf("unexpected argument %q", fs.Arg(1))
+	}
+	return input, nil
+}
+
 func researchPlannerFromEnv() workflow.ResearchPlanner {
 	if strings.TrimSpace(os.Getenv("OPENAI_API_KEY")) == "" || strings.TrimSpace(os.Getenv("OPENAI_MODEL")) == "" {
 		return workflow.DeterministicResearchPlanner{}
@@ -448,6 +531,8 @@ Usage:
   hermeneia show              show a content run
   hermeneia revise            create a new brief revision
   hermeneia render            render/export run artifacts
+  hermeneia schedule          create a scheduled publishing record
+  hermeneia schedules         list scheduled publishing records
   hermeneia serve             run the local HTTP API
 
 Help:
@@ -462,5 +547,6 @@ Examples:
   hermeneia research --topic "AI agents" --source "https://example.com/news"
   hermeneia revise <run-id> --instruction "Make the hook sharper"
   hermeneia render <run-id>
+  hermeneia schedule <run-id> --platform instagram --at 2026-05-10T02:00:00Z
   hermeneia serve --addr 127.0.0.1:19317`)
 }

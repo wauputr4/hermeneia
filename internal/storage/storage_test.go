@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestMigrateAndRepositoryCreateRead(t *testing.T) {
@@ -41,6 +42,9 @@ func TestMigrateAndRepositoryCreateRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := repo.CreateArtifact(ctx, Artifact{ID: "artifact-2", RunID: "run-1", BriefVersionID: "brief-2", Kind: "caption_txt", Path: "runs/run-1/output/caption.txt"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.CreateScheduledPost(ctx, ScheduledPost{ID: "schedule-1", RunID: "run-1", ArtifactID: "artifact-2", Platform: "instagram", ScheduledAt: mustTime(t, "2026-05-10T02:00:00Z"), Status: "scheduled", ValidationJSON: `{"credentials_stored_in_db":false}`}); err != nil {
 		t.Fatal(err)
 	}
 	run, err := repo.GetContentRun(ctx, "run-1")
@@ -88,9 +92,32 @@ func TestMigrateAndRepositoryCreateRead(t *testing.T) {
 	if artifacts[0].CreatedAt.IsZero() || artifacts[1].CreatedAt.IsZero() {
 		t.Fatalf("expected database timestamps in artifacts: %#v", artifacts)
 	}
+	post, err := repo.GetScheduledPost(ctx, "schedule-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if post.Platform != "instagram" || post.Status != "scheduled" || post.ArtifactID != "artifact-2" {
+		t.Fatalf("unexpected scheduled post: %#v", post)
+	}
+	posts, err := repo.ListScheduledPostsByRun(ctx, "run-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(posts) != 1 || posts[0].ID != "schedule-1" || posts[0].CreatedAt.IsZero() || posts[0].UpdatedAt.IsZero() {
+		t.Fatalf("unexpected scheduled posts: %#v", posts)
+	}
 	if _, err := repo.GetContentRun(ctx, "missing"); err != sql.ErrNoRows {
 		t.Fatalf("expected sql.ErrNoRows, got %v", err)
 	}
+}
+
+func mustTime(t *testing.T, value string) time.Time {
+	t.Helper()
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return parsed
 }
 
 func TestDatabasePathFromEnv(t *testing.T) {
