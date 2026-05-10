@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/wauputr4/hermeneia/internal/render"
 	"github.com/wauputr4/hermeneia/internal/runfiles"
@@ -83,7 +84,8 @@ func TestServerContentRunWorkflow(t *testing.T) {
 	if renderResult.Artifacts[0].CreatedAt.IsZero() {
 		t.Fatalf("expected render artifact timestamp, got %s", renderResult.Artifacts[0].CreatedAt)
 	}
-	schedule := request(t, handler, http.MethodPost, "/v1/runs/"+created.Run.ID+"/schedule", `{"platform":"instagram","artifact_id":"`+renderResult.Artifacts[0].ID+`","scheduled_at":"2026-05-10T02:00:00Z"}`)
+	scheduledAt := time.Now().UTC().Add(time.Hour).Format(time.RFC3339)
+	schedule := request(t, handler, http.MethodPost, "/v1/runs/"+created.Run.ID+"/schedule", `{"platform":"instagram","artifact_id":"`+renderResult.Artifacts[0].ID+`","scheduled_at":"`+scheduledAt+`"}`)
 	assertStatus(t, schedule, http.StatusCreated)
 	var scheduled schedulePostResponse
 	decodeResponse(t, schedule, &scheduled)
