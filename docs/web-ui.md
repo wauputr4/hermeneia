@@ -10,7 +10,7 @@ The MVP slice supports:
 - inspecting a selected run,
 - reviewing brief versions,
 - viewing revision history,
-- viewing artifact paths grouped by kind,
+- previewing generated image/video artifacts grouped by kind,
 - creating a run with a template-aware form,
 - saving deterministic revision instructions,
 - triggering render/export jobs.
@@ -22,7 +22,7 @@ The UI does not own business logic. It calls the API documented in [HTTP API](ap
 Start the Go API:
 
 ```bash
-go run ./cmd/hermeneia serve --addr 127.0.0.1:19317
+go run ./cmd/hermeneia serve --addr 127.0.0.1:19318
 ```
 
 Start the SvelteKit app:
@@ -36,10 +36,10 @@ npm run dev
 Configuration:
 
 ```text
-PUBLIC_HERMENEIA_API_BASE=http://127.0.0.1:19317
+PUBLIC_HERMENEIA_API_BASE=http://127.0.0.1:19318
 ```
 
-When unset, the app defaults to `http://127.0.0.1:19317`.
+When unset, the app defaults to `http://127.0.0.1:19318`.
 
 ## Validation
 

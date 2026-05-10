@@ -109,6 +109,21 @@ func TestServerContentRunWorkflow(t *testing.T) {
 	if len(scheduleList.ScheduledPosts) != 1 || scheduleList.ScheduledPosts[0].ID != scheduled.Post.ID {
 		t.Fatalf("schedule list mismatch: %#v", scheduleList.ScheduledPosts)
 	}
+	var previewArtifact artifactResponse
+	for _, artifact := range renderResult.Artifacts {
+		if artifact.Kind == "carousel_png" {
+			previewArtifact = artifact
+			break
+		}
+	}
+	if previewArtifact.ID == "" {
+		t.Fatalf("expected previewable carousel artifact: %#v", renderResult.Artifacts)
+	}
+	file := request(t, handler, http.MethodGet, "/v1/runs/"+created.Run.ID+"/artifacts/"+previewArtifact.ID+"/file", "")
+	assertStatus(t, file, http.StatusOK)
+	if file.Body.String() != "fake png" {
+		t.Fatalf("unexpected artifact file body: %q", file.Body.String())
+	}
 
 	deleted := request(t, handler, http.MethodDelete, "/v1/runs/"+created.Run.ID, "")
 	assertStatus(t, deleted, http.StatusNoContent)

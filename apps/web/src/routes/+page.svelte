@@ -1,5 +1,6 @@
 <script lang="ts">
 	import {
+		artifactFileURL,
 		createRun,
 		listRuns,
 		renderRun,
@@ -12,6 +13,7 @@
 	import {
 		TEMPLATES,
 		artifactGroups,
+		artifactPreviewType,
 		formatShortDate,
 		latestBrief,
 		runSummary,
@@ -262,7 +264,18 @@
 								<div class="artifact-group">
 									<h4>{kind}</h4>
 									{#each artifacts as artifact}
-										<p><span>{artifact.path}</span><small>{artifact.checksum || 'no checksum'}</small></p>
+										{@const previewType = artifactPreviewType(artifact)}
+										<div class="artifact-card">
+											{#if previewType === 'image'}
+												<img src={artifactFileURL(artifact)} alt={artifact.path} loading="lazy" />
+											{:else if previewType === 'video'}
+												<video src={artifactFileURL(artifact)} controls muted playsinline></video>
+											{/if}
+											<p>
+												<a href={artifactFileURL(artifact)} target="_blank" rel="noreferrer">{artifact.path}</a>
+												<small>{artifact.checksum || 'no checksum'}</small>
+											</p>
+										</div>
 									{/each}
 								</div>
 							{/each}
@@ -287,7 +300,7 @@
 			{:else}
 				<div class="empty">
 					<h2>Connect to the local Hermeneia API.</h2>
-					<p>Start the Go server with <code>hermeneia serve --addr 127.0.0.1:19317</code>.</p>
+					<p>Start the Go server with <code>hermeneia serve --addr 127.0.0.1:19318</code>.</p>
 				</div>
 			{/if}
 		</section>
@@ -472,8 +485,7 @@
 
 	.panel-head,
 	.detail-head,
-	.stats,
-	.artifact-group p {
+	.stats {
 		display: flex;
 		gap: 12px;
 		align-items: center;
@@ -622,12 +634,41 @@
 		padding-top: 10px;
 	}
 
-	.artifact-group p {
-		align-items: start;
-		margin-top: 8px;
+	.artifact-card {
+		display: grid;
+		gap: 8px;
+		margin-top: 10px;
+	}
+
+	.artifact-card img,
+	.artifact-card video {
+		width: min(100%, 320px);
+		border: 1px solid #1d241f;
+		background: #1d241f;
+		box-shadow: 3px 3px 0 rgba(29, 36, 31, 0.72);
+	}
+
+	.artifact-card img {
+		aspect-ratio: 4 / 5;
+		object-fit: cover;
+	}
+
+	.artifact-card video {
+		aspect-ratio: 9 / 16;
+	}
+
+	.artifact-card p {
+		display: grid;
+		gap: 4px;
+		margin-top: 2px;
 		font-family: 'Courier New', monospace;
 		font-size: 0.75rem;
 		word-break: break-word;
+	}
+
+	.artifact-card a {
+		color: #1d241f;
+		text-decoration-color: #8b2d1e;
 	}
 
 	.artifact-group small {

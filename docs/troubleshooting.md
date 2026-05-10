@@ -91,7 +91,7 @@ If video rendering fails with an `ffmpeg is required` message, install `ffmpeg` 
 
 ## 2026-05-09 — HTTP API MVP slice
 
-The local HTTP API is exposed through `hermeneia serve --addr 127.0.0.1:19317`.
+The local HTTP API is exposed through `hermeneia serve --addr 127.0.0.1:19318`.
 
 Notes:
 
@@ -132,12 +132,12 @@ crash the dashboard.
 The local web UI in `apps/web` expects the Go API to be running first:
 
 ```bash
-go run ./cmd/hermeneia serve --addr 127.0.0.1:19317
+go run ./cmd/hermeneia serve --addr 127.0.0.1:19318
 ```
 
 Notes:
 
-- The frontend defaults to `http://127.0.0.1:19317`; set `PUBLIC_HERMENEIA_API_BASE` if the API runs elsewhere.
+- The frontend defaults to `http://127.0.0.1:19318`; set `PUBLIC_HERMENEIA_API_BASE` if the API runs elsewhere.
 - Browser CORS behavior may matter once the dev server and API use different origins. Keep local API development on loopback and add explicit API CORS handling before exposing it outside local development.
 - Run `npm test` inside `apps/web` for view-model helper coverage. Full SvelteKit build validation requires installing frontend dependencies with `npm install`.
 

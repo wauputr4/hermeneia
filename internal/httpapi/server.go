@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/wauputr4/hermeneia/internal/storage"
@@ -43,6 +45,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /v1/runs/{runID}", s.handleDeleteRun)
 	s.mux.HandleFunc("GET /v1/runs/{runID}/briefs", s.handleListBriefs)
 	s.mux.HandleFunc("GET /v1/runs/{runID}/artifacts", s.handleListArtifacts)
+	s.mux.HandleFunc("GET /v1/runs/{runID}/artifacts/{artifactID}/file", s.handleArtifactFile)
 	s.mux.HandleFunc("POST /v1/runs/{runID}/revisions", s.handleReviseRun)
 	s.mux.HandleFunc("POST /v1/runs/{runID}/render", s.handleRenderRun)
 	s.mux.HandleFunc("POST /v1/runs/{runID}/schedule", s.handleSchedulePost)
@@ -147,6 +150,50 @@ func (s *Server) handleListArtifacts(w http.ResponseWriter, r *http.Request) {
 		artifacts = append(artifacts, newArtifactResponse(artifact))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"artifacts": artifacts})
+}
+
+func (s *Server) handleArtifactFile(w http.ResponseWriter, r *http.Request) {
+	runID := r.PathValue("runID")
+	artifactID := r.PathValue("artifactID")
+	artifactRows, err := s.service.ListArtifacts(r.Context(), runID)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	var artifact storage.Artifact
+	found := false
+	for _, row := range artifactRows {
+		if row.ID == artifactID {
+			artifact = row
+			found = true
+			break
+		}
+	}
+	if !found {
+		writeServiceError(w, sql.ErrNoRows)
+		return
+	}
+	path, err := s.safeArtifactPath(runID, artifact.Path)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	http.ServeFile(w, r, path)
+}
+
+func (s *Server) safeArtifactPath(runID, artifactPath string) (string, error) {
+	runDir, err := filepath.Abs(s.service.Files.RunDir(runID))
+	if err != nil {
+		return "", err
+	}
+	path, err := filepath.Abs(filepath.Clean(artifactPath))
+	if err != nil {
+		return "", err
+	}
+	if path != runDir && !strings.HasPrefix(path, runDir+string(filepath.Separator)) {
+		return "", workflow.ErrInvalidInput
+	}
+	return path, nil
 }
 
 func (s *Server) handleReviseRun(w http.ResponseWriter, r *http.Request) {
