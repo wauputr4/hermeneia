@@ -199,6 +199,36 @@ func TestServerResearchRunAndValidation(t *testing.T) {
 	assertStatus(t, missing, http.StatusNotFound)
 }
 
+func TestServerTemplateCatalog(t *testing.T) {
+	handler := newTestHandler(t)
+
+	list := request(t, handler, http.MethodGet, "/v1/templates", "")
+	assertStatus(t, list, http.StatusOK)
+	var listed struct {
+		Templates []templateResponse `json:"templates"`
+	}
+	decodeResponse(t, list, &listed)
+	if len(listed.Templates) != 2 {
+		t.Fatalf("expected built-in templates, got %#v", listed.Templates)
+	}
+	if listed.Templates[0].ID == "" || listed.Templates[0].InputSchema == nil {
+		t.Fatalf("unexpected template list response: %#v", listed.Templates)
+	}
+
+	show := request(t, handler, http.MethodGet, "/v1/templates/carousel/ai-news-clean", "")
+	assertStatus(t, show, http.StatusOK)
+	var detail struct {
+		Template templateResponse `json:"template"`
+	}
+	decodeResponse(t, show, &detail)
+	if detail.Template.ID != "carousel/ai-news-clean" || detail.Template.Renderer == "" {
+		t.Fatalf("unexpected template detail: %#v", detail.Template)
+	}
+
+	missing := request(t, handler, http.MethodGet, "/v1/templates/missing/template", "")
+	assertStatus(t, missing, http.StatusNotFound)
+}
+
 func TestWriteServiceErrorStatusMapping(t *testing.T) {
 	tests := []struct {
 		name string

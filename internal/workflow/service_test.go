@@ -429,6 +429,38 @@ func TestServiceCleanupUsesUncancelledContext(t *testing.T) {
 	}
 }
 
+func TestServiceListsAndValidatesTemplates(t *testing.T) {
+	ctx := context.Background()
+	db, err := storage.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := storage.Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+
+	service := NewService(storage.NewRepository(db), runfiles.New(t.TempDir()))
+	manifests, err := service.ListTemplates(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(manifests) != 2 {
+		t.Fatalf("expected built-in templates, got %#v", manifests)
+	}
+	template, err := service.GetTemplate(ctx, "carousel/ai-news-clean")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if template.Path == "" || template.ContentType != ContentTypeCarousel {
+		t.Fatalf("unexpected template: %#v", template)
+	}
+	_, err = service.CreateRun(ctx, CreateInput{Topic: "AI agents", ContentType: "carousel", TemplateID: "missing/template"})
+	if err == nil || !errors.Is(err, ErrInvalidInput) || !strings.Contains(err.Error(), "template not found") {
+		t.Fatalf("expected unknown template validation error, got %v", err)
+	}
+}
+
 func TestServiceShowRunRequiresExistingRun(t *testing.T) {
 	ctx := context.Background()
 	db, err := storage.Open(":memory:")

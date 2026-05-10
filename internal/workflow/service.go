@@ -337,6 +337,22 @@ func (s Service) ListRuns(ctx context.Context) ([]storage.ContentRun, error) {
 	return s.Repo.ListContentRuns(ctx)
 }
 
+func (s Service) ListTemplates(ctx context.Context) ([]templates.Manifest, error) {
+	catalog, err := s.templateCatalog()
+	if err != nil {
+		return nil, err
+	}
+	return catalog.All(), nil
+}
+
+func (s Service) GetTemplate(ctx context.Context, id string) (templates.Manifest, error) {
+	catalog, err := s.templateCatalog()
+	if err != nil {
+		return templates.Manifest{}, err
+	}
+	return catalog.Get(id)
+}
+
 func (s Service) ShowRun(ctx context.Context, runID string) (RunDetails, error) {
 	runID = strings.TrimSpace(runID)
 	if runID == "" {
@@ -930,17 +946,12 @@ func normalizeContentType(value string) (string, error) {
 }
 
 func (s Service) resolveTemplate(contentType, templateID string) (templates.Manifest, error) {
-	catalog := s.Templates
-	if catalog.Len() == 0 {
-		var err error
-		catalog, err = templates.LoadBuiltIn()
-		if err != nil {
-			return templates.Manifest{}, fmt.Errorf("load templates: %w", err)
-		}
+	catalog, err := s.templateCatalog()
+	if err != nil {
+		return templates.Manifest{}, err
 	}
 	templateID = strings.TrimSpace(templateID)
 	var manifest templates.Manifest
-	var err error
 	if templateID == "" {
 		manifest, err = catalog.Default(contentType)
 	} else {
@@ -953,6 +964,18 @@ func (s Service) resolveTemplate(contentType, templateID string) (templates.Mani
 		return templates.Manifest{}, invalidInput(fmt.Sprintf("template %q is for content type %q, not %q", manifest.ID, manifest.ContentType, contentType))
 	}
 	return manifest, nil
+}
+
+func (s Service) templateCatalog() (templates.Catalog, error) {
+	catalog := s.Templates
+	if catalog.Len() > 0 {
+		return catalog, nil
+	}
+	catalog, err := templates.LoadBuiltIn()
+	if err != nil {
+		return templates.Catalog{}, fmt.Errorf("load templates: %w", err)
+	}
+	return catalog, nil
 }
 
 func rendererName(contentType string) string {

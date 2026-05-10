@@ -39,6 +39,42 @@ Returns:
 {"status":"ok"}
 ```
 
+### List Templates
+
+```http
+GET /v1/templates
+```
+
+Returns manifest-backed template metadata without local filesystem paths:
+
+```json
+{
+  "templates": [
+    {
+      "id": "carousel/ai-news-clean",
+      "name": "AI News Clean Carousel",
+      "content_type": "carousel",
+      "description": "A clean editorial carousel for AI news and explainers.",
+      "version": "1.0.0",
+      "aspect_ratio": "4:5",
+      "renderer": "go-png",
+      "output_kinds": ["content_json", "carousel_png", "caption_text"],
+      "input_schema": {"type": "object"}
+    }
+  ]
+}
+```
+
+### Get Template
+
+```http
+GET /v1/templates/{template_id}
+```
+
+Template IDs contain slashes, so a detail request uses the natural path form,
+for example `GET /v1/templates/carousel/ai-news-clean`. Unknown template IDs
+return `404 Not Found`.
+
 ### List Runs
 
 ```http
