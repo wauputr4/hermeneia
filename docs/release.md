@@ -20,8 +20,16 @@ Run these checks from a clean `main` checkout:
 git pull
 go test ./...
 git diff --check
+npm --prefix apps/web ci
+npm --prefix apps/web test
+npm --prefix apps/web run build
 go build -o dist/hermeneia ./cmd/hermeneia
 ```
+
+GitHub pull requests should also report both CI jobs before release:
+
+- `Go test`
+- `Web UI`
 
 Confirm the working tree is clean:
 
