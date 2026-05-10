@@ -7,7 +7,7 @@ on:
       - main
 
 jobs:
-  test:
+  go:
     name: Go test
     runs-on: ubuntu-latest
     steps:
@@ -28,3 +28,29 @@ jobs:
 
       - name: Build CLI
         run: go build ./cmd/hermeneia
+
+  web:
+    name: Web UI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Web UI tests
+        run: npm test
+
+      - name: Build Web UI
+        run: npm run build
