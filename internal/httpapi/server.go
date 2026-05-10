@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/wauputr4/hermeneia/internal/storage"
+	"github.com/wauputr4/hermeneia/internal/templates"
 	"github.com/wauputr4/hermeneia/internal/workflow"
 )
 
@@ -39,6 +40,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /health", s.handleHealth)
+	s.mux.HandleFunc("GET /v1/templates", s.handleListTemplates)
+	s.mux.HandleFunc("GET /v1/templates/{templateID...}", s.handleGetTemplate)
 	s.mux.HandleFunc("GET /v1/runs", s.handleListRuns)
 	s.mux.HandleFunc("POST /v1/runs", s.handleCreateRun)
 	s.mux.HandleFunc("POST /v1/research-runs", s.handleCreateResearchRun)
@@ -55,6 +58,28 @@ func (s *Server) routes() {
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
+	manifests, err := s.service.ListTemplates(r.Context())
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	out := make([]templateResponse, 0, len(manifests))
+	for _, manifest := range manifests {
+		out = append(out, newTemplateResponse(manifest))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"templates": out})
+}
+
+func (s *Server) handleGetTemplate(w http.ResponseWriter, r *http.Request) {
+	manifest, err := s.service.GetTemplate(r.Context(), r.PathValue("templateID"))
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"template": newTemplateResponse(manifest)})
 }
 
 func (s *Server) handleListRuns(w http.ResponseWriter, r *http.Request) {
@@ -365,6 +390,36 @@ type runDetailsResponse struct {
 	Schedules []scheduledPostResponse `json:"scheduled_posts"`
 }
 
+type templateResponse struct {
+	ID           string          `json:"id"`
+	Name         string          `json:"name"`
+	ContentType  string          `json:"content_type"`
+	Description  string          `json:"description"`
+	Version      string          `json:"version"`
+	AspectRatio  string          `json:"aspect_ratio"`
+	Renderer     string          `json:"renderer"`
+	OutputKinds  []string        `json:"output_kinds"`
+	InputSchema  json.RawMessage `json:"input_schema"`
+	PreviewAsset string          `json:"preview_asset,omitempty"`
+	Assets       []string        `json:"assets,omitempty"`
+}
+
+func newTemplateResponse(manifest templates.Manifest) templateResponse {
+	return templateResponse{
+		ID:           manifest.ID,
+		Name:         manifest.Name,
+		ContentType:  manifest.ContentType,
+		Description:  manifest.Description,
+		Version:      manifest.Version,
+		AspectRatio:  manifest.AspectRatio,
+		Renderer:     manifest.Renderer,
+		OutputKinds:  append([]string(nil), manifest.OutputKinds...),
+		InputSchema:  append(json.RawMessage(nil), manifest.InputSchema...),
+		PreviewAsset: manifest.PreviewAsset,
+		Assets:       append([]string(nil), manifest.Assets...),
+	}
+}
+
 func newRunDetailsResponse(details workflow.RunDetails) runDetailsResponse {
 	briefs := make([]briefResponse, 0, len(details.Briefs))
 	for _, brief := range details.Briefs {
@@ -515,7 +570,7 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 }
 
 func writeServiceError(w http.ResponseWriter, err error) {
-	if errors.Is(err, sql.ErrNoRows) || errors.Is(err, os.ErrNotExist) {
+	if errors.Is(err, sql.ErrNoRows) || errors.Is(err, os.ErrNotExist) || errors.Is(err, templates.ErrNotFound) {
 		writeError(w, http.StatusNotFound, err)
 		return
 	}

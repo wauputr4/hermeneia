@@ -105,6 +105,7 @@ go run ./cmd/hermeneia init
 go run ./cmd/hermeneia create --topic "AI agents in marketing" --type carousel
 go run ./cmd/hermeneia research --topic "AI agents in marketing" --source "https://example.com/ai-agents"
 go run ./cmd/hermeneia research --topic "AI agents in marketing" --planner openai --source "https://example.com/ai-agents"
+go run ./cmd/hermeneia templates
 go run ./cmd/hermeneia revise <run-id> --instruction "Make the hook sharper"
 go run ./cmd/hermeneia render <run-id>
 go run ./cmd/hermeneia schedule <run-id> --platform instagram --at 2026-05-10T02:00:00Z
@@ -151,6 +152,7 @@ Current CLI surface:
 - `hermeneia create` creates a run, writes `brief.v1.json`, and stores SQLite metadata.
 - `hermeneia research` creates a run from traceable source URLs, writes `research.json`, and generates a schema-valid brief draft.
 - `hermeneia research --planner openai` uses the optional OpenAI Responses API planner when `OPENAI_API_KEY` and `OPENAI_MODEL` are configured.
+- `hermeneia templates` lists the local manifest-backed template catalog.
 - `hermeneia list` lists stored runs.
 - `hermeneia show` displays run, version, revision, and artifact counts.
 - `hermeneia revise` creates the next brief version and records a revision event. In the MVP it applies a deterministic revision note instead of calling OpenAI.

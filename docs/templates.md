@@ -25,6 +25,16 @@ The built-in loader scans local `template.json` files deterministically and
 rejects duplicate IDs, missing required fields, unsupported content types, and
 ID/path mismatches.
 
+Hermeneia exposes the same manifest-backed catalog through:
+
+- CLI: `hermeneia templates`
+- HTTP API: `GET /v1/templates`
+- HTTP API: `GET /v1/templates/carousel/ai-news-clean`
+
+API responses intentionally omit local manifest paths. Manifests are the source
+of truth for template metadata; SQLite stores the selected template ID on runs
+and keeps a lightweight template row for run metadata relationships.
+
 ## Manifest Contract
 
 Hermeneia template manifests are JSON. Required fields:

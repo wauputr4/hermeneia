@@ -70,6 +70,8 @@ func (c command) run(ctx context.Context, args []string) error {
 		return c.create(ctx, args[1:])
 	case "research":
 		return c.research(ctx, args[1:])
+	case "templates":
+		return c.templates(ctx, args[1:])
 	case "list":
 		return c.list(ctx, args[1:])
 	case "show":
@@ -126,6 +128,32 @@ func (c command) research(ctx context.Context, args []string) error {
 		}
 		fmt.Fprintf(c.stdout, "created research run %s\nresearch %s\nbrief %s\n", result.Run.ID, result.ResearchPath, result.BriefPath)
 		return nil
+	})
+}
+
+func (c command) templates(ctx context.Context, args []string) error {
+	fs := c.flagSet("templates")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() > 0 {
+		return fmt.Errorf("templates does not accept positional arguments")
+	}
+	return c.withService(ctx, func(s workflow.Service) error {
+		manifests, err := s.ListTemplates(ctx)
+		if err != nil {
+			return err
+		}
+		if len(manifests) == 0 {
+			fmt.Fprintln(c.stdout, "no templates found")
+			return nil
+		}
+		w := tabwriter.NewWriter(c.stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "ID\tTYPE\tRENDERER\tVERSION\tDESCRIPTION")
+		for _, manifest := range manifests {
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", manifest.ID, manifest.ContentType, manifest.Renderer, manifest.Version, manifest.Description)
+		}
+		return w.Flush()
 	})
 }
 
@@ -527,6 +555,7 @@ Usage:
   hermeneia init              initialize the SQLite database
   hermeneia create            create a content run
   hermeneia research          create a run from traceable research sources
+  hermeneia templates         list available templates
   hermeneia list              list content runs
   hermeneia show              show a content run
   hermeneia revise            create a new brief revision
@@ -544,6 +573,7 @@ Configuration:
 
 Examples:
   hermeneia create --topic "AI agents in marketing" --type carousel
+  hermeneia templates
   hermeneia research --topic "AI agents" --source "https://example.com/news"
   hermeneia revise <run-id> --instruction "Make the hook sharper"
   hermeneia render <run-id>
