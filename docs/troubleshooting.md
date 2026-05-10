@@ -167,3 +167,18 @@ Notes:
 - Keep `workflow.NewService` preloaded with the built-in catalog when possible so repeated create/research calls do not rescan the template tree on every request.
 - Use `hermeneia templates` or `GET /v1/templates` to inspect the active template catalog before creating runs with explicit template IDs.
 - Template API responses must omit local `Path` details from manifests; expose IDs and metadata only.
+
+## 2026-05-10 — API-driven Web UI template gallery
+
+The Web UI create-run form loads templates from `GET /v1/templates` instead of
+keeping a hardcoded frontend list.
+
+Notes:
+
+- Start the Go API before opening the SvelteKit app; otherwise the template
+  selector shows a user-facing catalog load error.
+- Template filtering uses manifest `content_type` values such as `carousel` and
+  `short_video`.
+- If the template catalog is empty or has no compatible template for the
+  selected content type, the create button stays disabled until the API returns
+  a usable template ID.

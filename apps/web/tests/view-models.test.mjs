@@ -7,7 +7,10 @@ import {
 	formatShortDate,
 	latestBrief,
 	runSummary,
-	templateForType
+	templateContentTypeLabel,
+	templateForType,
+	templateLabel,
+	templatesForType
 } from '../src/lib/view-models.js';
 
 describe('web view model helpers', () => {
@@ -59,8 +62,34 @@ describe('web view model helpers', () => {
 	});
 
 	it('keeps template selection aligned to content type', () => {
-		assert.equal(templateForType('video'), 'video/ai-news-short');
-		assert.equal(templateForType('carousel'), 'carousel/ai-news-clean');
+		const templates = [
+			{ id: 'video/ai-news-short', name: 'AI news short video', content_type: 'short_video' },
+			{ id: 'carousel/ai-news-clean', name: 'AI news carousel', content_type: 'carousel' }
+		];
+
+		assert.equal(templateForType(templates, 'short_video'), 'video/ai-news-short');
+		assert.equal(templateForType(templates, 'carousel'), 'carousel/ai-news-clean');
+		assert.equal(templateForType(templates, 'thread'), '');
+	});
+
+	it('filters and sorts template catalog entries by content type', () => {
+		const templates = [
+			{ id: 'carousel/z', name: 'Zebra', content_type: 'carousel' },
+			{ id: 'video/ai-news-short', name: 'AI news short video', content_type: 'short_video' },
+			{ id: 'carousel/a', name: 'Alpha', content_type: 'carousel' }
+		];
+
+		assert.deepEqual(
+			templatesForType(templates, 'carousel').map((template) => template.id),
+			['carousel/a', 'carousel/z']
+		);
+	});
+
+	it('formats template display labels', () => {
+		assert.equal(templateLabel({ id: 'carousel/ai-news-clean', name: 'AI News Clean Carousel' }), 'AI News Clean Carousel');
+		assert.equal(templateLabel({ id: 'carousel/custom', name: '' }), 'carousel/custom');
+		assert.equal(templateContentTypeLabel('short_video'), 'Short video');
+		assert.equal(templateContentTypeLabel('carousel'), 'Carousel');
 	});
 
 	it('formats invalid dates without throwing', () => {

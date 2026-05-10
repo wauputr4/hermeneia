@@ -2,38 +2,45 @@
 	import {
 		artifactFileURL,
 		createRun,
+		listTemplates,
 		listRuns,
 		renderRun,
 		reviseRun,
 		showRun,
 		type BriefVersion,
 		type ContentRun,
-		type RunDetails
+		type RunDetails,
+		type Template
 	} from '$lib/api';
 	import {
-		TEMPLATES,
 		artifactGroups,
 		artifactPreviewType,
 		formatShortDate,
 		latestBrief,
 		runSummary,
-		templateForType
+		templateContentTypeLabel,
+		templateForType,
+		templateLabel,
+		templatesForType
 	} from '$lib/view-models.js';
 	import { onMount } from 'svelte';
 
 	let runs = $state<ContentRun[]>([]);
+	let templates = $state<Template[]>([]);
 	let selectedRunID = $state('');
 	let selectedDetails = $state<RunDetails | null>(null);
 	let selectedBrief = $state<BriefVersion | null>(null);
 	let loading = $state(true);
+	let loadingTemplates = $state(true);
 	let busy = $state(false);
 	let error = $state('');
+	let templateError = $state('');
 	let notice = $state('');
 	let revisionInstruction = $state('');
 	let createForm = $state({
 		topic: 'AI agents in marketing',
 		content_type: 'carousel',
-		template_id: 'carousel/ai-news-clean',
+		template_id: '',
 		tone: 'clear and practical',
 		platform: 'instagram',
 		target_audience: 'content operators'
@@ -46,13 +53,35 @@
 		selectedDetails ? [...artifactGroups(selectedDetails.artifacts).entries()] : []
 	);
 	const selectedTemplateOptions = $derived(
-		TEMPLATES.filter((template) => template.type === createForm.content_type)
+		templatesForType(templates, createForm.content_type)
+	);
+	const selectedTemplate = $derived(
+		templates.find((template) => template.id === createForm.template_id) ?? null
 	);
 	const activeSummary = $derived(
 		selectedDetails && selectedDetails.run ? runSummary(selectedDetails.run, selectedDetails) : null
 	);
 
-	onMount(loadRuns);
+	onMount(async () => {
+		await Promise.all([loadTemplates(), loadRuns()]);
+	});
+
+	async function loadTemplates() {
+		loadingTemplates = true;
+		templateError = '';
+		try {
+			templates = await listTemplates();
+			if (!createForm.template_id || !templates.some((template) => template.id === createForm.template_id)) {
+				createForm.template_id = templateForType(templates, createForm.content_type);
+			}
+		} catch (err) {
+			templates = [];
+			createForm.template_id = '';
+			templateError = err instanceof Error ? err.message : 'Unable to load template catalog';
+		} finally {
+			loadingTemplates = false;
+		}
+	}
 
 	async function loadRuns() {
 		loading = true;
@@ -81,6 +110,10 @@
 	}
 
 	async function submitCreateRun() {
+		if (!createForm.template_id) {
+			templateError = 'Select a compatible template before creating a run.';
+			return;
+		}
 		busy = true;
 		error = '';
 		notice = '';
@@ -131,7 +164,7 @@
 
 	function changeContentType(value: string) {
 		createForm.content_type = value;
-		createForm.template_id = templateForType(value);
+		createForm.template_id = templateForType(templates, value);
 	}
 </script>
 
@@ -322,17 +355,35 @@
 					Content type
 					<select value={createForm.content_type} onchange={(event) => changeContentType(event.currentTarget.value)}>
 						<option value="carousel">Carousel</option>
-						<option value="video">Short video</option>
+						<option value="short_video">Short video</option>
 					</select>
 				</label>
 				<label>
 					Template
-					<select bind:value={createForm.template_id}>
-						{#each selectedTemplateOptions as template}
-							<option value={template.id}>{template.label}</option>
-						{/each}
+					<select bind:value={createForm.template_id} disabled={loadingTemplates || selectedTemplateOptions.length === 0}>
+						{#if loadingTemplates}
+							<option value="">Loading templates...</option>
+						{:else if selectedTemplateOptions.length === 0}
+							<option value="">No compatible templates</option>
+						{:else}
+							{#each selectedTemplateOptions as template}
+								<option value={template.id}>{templateLabel(template)}</option>
+							{/each}
+						{/if}
 					</select>
 				</label>
+				{#if templateError}
+					<p class="field-note error-text">{templateError}</p>
+				{:else if selectedTemplate}
+					<div class="template-card">
+						<strong>{selectedTemplate.name}</strong>
+						<span>{templateContentTypeLabel(selectedTemplate.content_type)} / {selectedTemplate.aspect_ratio} / {selectedTemplate.renderer}</span>
+						<p>{selectedTemplate.description}</p>
+						<small>{selectedTemplate.output_kinds.join(', ')}</small>
+					</div>
+				{:else if !loadingTemplates}
+					<p class="field-note">No template is available for {templateContentTypeLabel(createForm.content_type)}.</p>
+				{/if}
 				<label>
 					Platform
 					<input bind:value={createForm.platform} />
@@ -345,7 +396,7 @@
 					Tone
 					<input bind:value={createForm.tone} />
 				</label>
-				<button type="submit" disabled={busy || !createForm.topic.trim()}>Create run</button>
+				<button type="submit" disabled={busy || !createForm.topic.trim() || !createForm.template_id}>Create run</button>
 			</form>
 		</aside>
 	</section>
@@ -674,6 +725,35 @@
 
 	.artifact-group small {
 		color: #8b2d1e;
+	}
+
+	.field-note,
+	.template-card {
+		font-family: 'Courier New', monospace;
+		font-size: 0.76rem;
+	}
+
+	.error-text {
+		color: #8b2d1e;
+	}
+
+	.template-card {
+		display: grid;
+		gap: 6px;
+		border: 1px solid #1d241f;
+		background: #fffaf0;
+		padding: 10px;
+	}
+
+	.template-card strong,
+	.template-card span,
+	.template-card small {
+		display: block;
+	}
+
+	.template-card span,
+	.template-card small {
+		color: #657166;
 	}
 
 	.timeline {
