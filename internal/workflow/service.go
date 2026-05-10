@@ -162,13 +162,17 @@ type ResearchPlanningInput struct {
 }
 
 func NewService(repo *storage.Repository, files runfiles.Store) Service {
-	return Service{
+	service := Service{
 		Repo:     repo,
 		Files:    files,
 		Carousel: render.CarouselRenderer{},
 		Video:    render.VideoRenderer{},
 		Planner:  DeterministicResearchPlanner{},
 	}
+	if catalog, err := templates.LoadBuiltIn(); err == nil {
+		service.Templates = catalog
+	}
+	return service
 }
 
 func (s Service) CreateRun(ctx context.Context, input CreateInput) (CreateResult, error) {
@@ -927,7 +931,7 @@ func normalizeContentType(value string) (string, error) {
 
 func (s Service) resolveTemplate(contentType, templateID string) (templates.Manifest, error) {
 	catalog := s.Templates
-	if len(catalog.All()) == 0 {
+	if catalog.Len() == 0 {
 		var err error
 		catalog, err = templates.LoadBuiltIn()
 		if err != nil {

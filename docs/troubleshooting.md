@@ -163,3 +163,5 @@ Notes:
 - Required manifest fields are documented in `docs/templates.md`.
 - The loader rejects missing fields, duplicate IDs, unsupported content types, invalid `input_schema` JSON, and ID/path mismatches before content runs are created.
 - `hermeneia create` and `hermeneia research` use the catalog to select default built-in templates and reject templates whose `content_type` does not match the requested run type.
+- Built-in template discovery should find the nearest ancestor `templates/` directory that actually contains at least one `template.json`; it must not require `go.mod`, so copied binary-plus-template deployments can still run.
+- Keep `workflow.NewService` preloaded with the built-in catalog when possible so repeated create/research calls do not rescan the template tree on every request.

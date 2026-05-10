@@ -12,8 +12,11 @@ func TestLoadDirLoadsBuiltInManifests(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := len(catalog.All()); got != 2 {
+	if got := catalog.Len(); got != 2 {
 		t.Fatalf("expected 2 built-in manifests, got %d", got)
+	}
+	if got := len(catalog.All()); got != catalog.Len() {
+		t.Fatalf("expected All to return every manifest, got %d", got)
 	}
 	carousel, err := catalog.Get("carousel/ai-news-clean")
 	if err != nil {
@@ -28,6 +31,32 @@ func TestLoadDirLoadsBuiltInManifests(t *testing.T) {
 	}
 	if video.ID != "video/ai-news-short" {
 		t.Fatalf("unexpected video default: %#v", video)
+	}
+}
+
+func TestLoadBuiltInDoesNotRequireGoMod(t *testing.T) {
+	root := t.TempDir()
+	writeManifest(t, filepath.Join(root, "templates"), "carousel/portable", validManifest("carousel/portable", "carousel"))
+
+	previous, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(filepath.Join(root, "templates", "carousel", "portable")); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Chdir(previous); err != nil {
+			t.Fatalf("restore cwd: %v", err)
+		}
+	}()
+
+	catalog, err := LoadBuiltIn()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := catalog.Len(); got != 1 {
+		t.Fatalf("expected 1 manifest without go.mod, got %d", got)
 	}
 }
 

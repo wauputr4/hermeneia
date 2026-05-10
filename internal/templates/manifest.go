@@ -1,6 +1,7 @@
 package templates
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -70,6 +71,7 @@ func LoadDir(root string) (Catalog, error) {
 		byID:     make(map[string]Manifest),
 		defaults: make(map[string]string),
 	}
+	var pathErr error
 	for _, path := range paths {
 		manifest, err := loadManifest(path)
 		if err != nil {
@@ -81,16 +83,17 @@ func LoadDir(root string) (Catalog, error) {
 		if _, exists := catalog.byID[manifest.ID]; exists {
 			return Catalog{}, fmt.Errorf("duplicate template id %q", manifest.ID)
 		}
+		if err := validateManifestPath(root, manifest); err != nil && pathErr == nil {
+			pathErr = err
+		}
 		catalog.byID[manifest.ID] = manifest
 		catalog.items = append(catalog.items, manifest)
 		if _, exists := catalog.defaults[manifest.ContentType]; !exists {
 			catalog.defaults[manifest.ContentType] = manifest.ID
 		}
 	}
-	for _, manifest := range catalog.items {
-		if err := validateManifestPath(root, manifest); err != nil {
-			return Catalog{}, err
-		}
+	if pathErr != nil {
+		return Catalog{}, pathErr
 	}
 	if len(catalog.items) == 0 {
 		return Catalog{}, fmt.Errorf("no template manifests found in %s", root)
@@ -102,6 +105,10 @@ func (c Catalog) All() []Manifest {
 	out := make([]Manifest, len(c.items))
 	copy(out, c.items)
 	return out
+}
+
+func (c Catalog) Len() int {
+	return len(c.items)
 }
 
 func (c Catalog) Get(id string) (Manifest, error) {
@@ -128,7 +135,7 @@ func loadManifest(path string) (Manifest, error) {
 		return Manifest{}, err
 	}
 	var manifest Manifest
-	dec := json.NewDecoder(strings.NewReader(string(data)))
+	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&manifest); err != nil {
 		return Manifest{}, fmt.Errorf("%s: %w", path, err)
@@ -188,7 +195,7 @@ func findBuiltInRoot() (string, error) {
 	}
 	for {
 		candidate := filepath.Join(dir, "templates")
-		if info, err := os.Stat(candidate); err == nil && info.IsDir() && fileExists(filepath.Join(dir, "go.mod")) {
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() && hasTemplateManifest(candidate) {
 			return candidate, nil
 		}
 		parent := filepath.Dir(dir)
@@ -200,7 +207,16 @@ func findBuiltInRoot() (string, error) {
 	return "", errors.New("built-in templates directory not found")
 }
 
-func fileExists(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && !info.IsDir()
+func hasTemplateManifest(root string) bool {
+	found := false
+	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || found {
+			return nil
+		}
+		if !d.IsDir() && filepath.Base(path) == "template.json" {
+			found = true
+		}
+		return nil
+	})
+	return found
 }
