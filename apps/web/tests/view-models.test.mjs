@@ -76,12 +76,13 @@ describe('web view model helpers', () => {
 		const templates = [
 			{ id: 'carousel/z', name: 'Zebra', content_type: 'carousel' },
 			{ id: 'video/ai-news-short', name: 'AI news short video', content_type: 'short_video' },
-			{ id: 'carousel/a', name: 'Alpha', content_type: 'carousel' }
+			{ id: 'carousel/a', name: 'Alpha', content_type: 'carousel' },
+			{ id: 'carousel/fallback', name: '', content_type: 'carousel' }
 		];
 
 		assert.deepEqual(
 			templatesForType(templates, 'carousel').map((template) => template.id),
-			['carousel/a', 'carousel/z']
+			['carousel/a', 'carousel/fallback', 'carousel/z']
 		);
 	});
 

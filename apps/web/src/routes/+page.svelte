@@ -71,8 +71,9 @@
 		templateError = '';
 		try {
 			templates = await listTemplates();
-			if (!createForm.template_id || !templates.some((template) => template.id === createForm.template_id)) {
-				createForm.template_id = templateForType(templates, createForm.content_type);
+			const compatible = templatesForType(templates, createForm.content_type);
+			if (!createForm.template_id || !compatible.some((template) => template.id === createForm.template_id)) {
+				createForm.template_id = compatible[0]?.id ?? '';
 			}
 		} catch (err) {
 			templates = [];
@@ -379,7 +380,7 @@
 						<strong>{selectedTemplate.name}</strong>
 						<span>{templateContentTypeLabel(selectedTemplate.content_type)} / {selectedTemplate.aspect_ratio} / {selectedTemplate.renderer}</span>
 						<p>{selectedTemplate.description}</p>
-						<small>{selectedTemplate.output_kinds.join(', ')}</small>
+						<small>{selectedTemplate.output_kinds?.join(', ') ?? ''}</small>
 					</div>
 				{:else if !loadingTemplates}
 					<p class="field-note">No template is available for {templateContentTypeLabel(createForm.content_type)}.</p>

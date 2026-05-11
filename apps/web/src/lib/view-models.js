@@ -38,9 +38,9 @@ export function runSummary(run, details) {
 }
 
 export function templatesForType(templates, contentType) {
-	return [...templates]
+	return templates
 		.filter((template) => template.content_type === contentType)
-		.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+		.sort((a, b) => templateLabel(a).localeCompare(templateLabel(b)) || a.id.localeCompare(b.id));
 }
 
 export function templateForType(templates, contentType) {
