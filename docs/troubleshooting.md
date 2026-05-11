@@ -201,6 +201,19 @@ Notes:
 - Use `maxItems` on carousel `slides` or video `scenes` to fail fast before partial render output is written.
 - Validation errors are returned through the CLI and HTTP API as normal invalid-input errors.
 
+## 2026-05-11 — Workflow preset contract
+
+Workflow presets live under `workflows/` as JSON contracts that map named flows
+to existing service steps. They intentionally do not execute arbitrary scripts.
+
+Notes:
+
+- Presets must use supported content types: `carousel` or `short_video`.
+- Supported step types are `create_brief`, `research_plan`, `revise_brief`, `render`, and `schedule_record`.
+- `default_template_id` must reference an installed template whose manifest content type matches the preset content type.
+- Duplicate preset IDs fail validation instead of overriding earlier presets.
+- Required preset fields are validated in a fixed order for deterministic errors. `required_inputs` must be non-empty so upcoming CLI/API/UI catalog consumers know which operator inputs are needed before execution.
+
 ## 2026-05-10 — API-driven Web UI template gallery
 
 The Web UI create-run form loads templates from `GET /v1/templates` instead of

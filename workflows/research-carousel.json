@@ -1,0 +1,17 @@
+{
+  "id": "research-carousel",
+  "name": "Research to Carousel",
+  "description": "Create a sourced research plan, draft a carousel brief, then render PNG slides.",
+  "content_type": "carousel",
+  "default_template_id": "carousel/ai-news-clean",
+  "steps": [
+    {"type": "research_plan", "name": "Build research plan"},
+    {"type": "create_brief", "name": "Create brief"},
+    {"type": "render", "name": "Render carousel"}
+  ],
+  "required_inputs": ["topic", "sources"],
+  "revision_policy": {
+    "mode": "manual",
+    "max_revisions": 3
+  }
+}
