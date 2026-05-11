@@ -78,11 +78,11 @@ func LoadFiles(paths []string, templateCatalog templates.Catalog) (Catalog, erro
 		if err != nil {
 			return Catalog{}, err
 		}
-		if existing, ok := catalog.byID[preset.ID]; ok {
-			return Catalog{}, fmt.Errorf("duplicate workflow preset id %q in %s conflicts with %s", preset.ID, preset.Path, existing.Path)
-		}
 		if err := ValidatePreset(preset, templateCatalog); err != nil {
 			return Catalog{}, err
+		}
+		if existing, ok := catalog.byID[preset.ID]; ok {
+			return Catalog{}, fmt.Errorf("duplicate workflow preset id %q in %s conflicts with %s", preset.ID, preset.Path, existing.Path)
 		}
 		catalog.byID[preset.ID] = preset
 		catalog.items = append(catalog.items, preset)
@@ -94,17 +94,23 @@ func LoadFiles(paths []string, templateCatalog templates.Catalog) (Catalog, erro
 }
 
 func ValidatePreset(preset Preset, templateCatalog templates.Catalog) error {
-	required := map[string]string{
-		"id":                  preset.ID,
-		"name":                preset.Name,
-		"description":         preset.Description,
-		"content_type":        preset.ContentType,
-		"default_template_id": preset.DefaultTemplateID,
+	if strings.TrimSpace(preset.ID) == "" {
+		return fmt.Errorf("%s: id is required", preset.Path)
 	}
-	for field, value := range required {
-		if strings.TrimSpace(value) == "" {
-			return fmt.Errorf("%s: %s is required", preset.Path, field)
-		}
+	if strings.TrimSpace(preset.Name) == "" {
+		return fmt.Errorf("%s: name is required", preset.Path)
+	}
+	if strings.TrimSpace(preset.Description) == "" {
+		return fmt.Errorf("%s: description is required", preset.Path)
+	}
+	if strings.TrimSpace(preset.ContentType) == "" {
+		return fmt.Errorf("%s: content_type is required", preset.Path)
+	}
+	if strings.TrimSpace(preset.DefaultTemplateID) == "" {
+		return fmt.Errorf("%s: default_template_id is required", preset.Path)
+	}
+	if len(preset.RequiredInputs) == 0 {
+		return fmt.Errorf("%s: required_inputs is required", preset.Path)
 	}
 	if !supportedContentType(preset.ContentType) {
 		return fmt.Errorf("%s: unsupported content_type %q", preset.Path, preset.ContentType)
@@ -135,6 +141,9 @@ func (c Catalog) All() []Preset {
 
 func (c Catalog) Get(id string) (Preset, error) {
 	id = strings.TrimSpace(id)
+	if c.byID == nil {
+		return Preset{}, fmt.Errorf("%w: %s", ErrNotFound, id)
+	}
 	preset, ok := c.byID[id]
 	if !ok {
 		return Preset{}, fmt.Errorf("%w: %s", ErrNotFound, id)

@@ -52,6 +52,7 @@ func TestValidatePresetRejectsUnknownStepType(t *testing.T) {
 		ContentType:       "carousel",
 		DefaultTemplateID: "carousel/clean",
 		Steps:             []Step{{Type: "execute_script"}},
+		RequiredInputs:    []string{"topic"},
 	}
 
 	err := ValidatePreset(preset, templateCatalog)
@@ -70,6 +71,7 @@ func TestValidatePresetRejectsMissingTemplateReference(t *testing.T) {
 		ContentType:       "carousel",
 		DefaultTemplateID: "carousel/missing",
 		Steps:             []Step{{Type: StepCreateBrief}},
+		RequiredInputs:    []string{"topic"},
 	}
 
 	err := ValidatePreset(preset, templateCatalog)
@@ -88,6 +90,7 @@ func TestValidatePresetRejectsInvalidContentType(t *testing.T) {
 		ContentType:       "thread",
 		DefaultTemplateID: "carousel/clean",
 		Steps:             []Step{{Type: StepCreateBrief}},
+		RequiredInputs:    []string{"topic"},
 	}
 
 	err := ValidatePreset(preset, templateCatalog)
@@ -106,11 +109,61 @@ func TestValidatePresetRejectsTemplateContentMismatch(t *testing.T) {
 		ContentType:       "carousel",
 		DefaultTemplateID: "video/short",
 		Steps:             []Step{{Type: StepCreateBrief}},
+		RequiredInputs:    []string{"topic"},
 	}
 
 	err := ValidatePreset(preset, templateCatalog)
 	if err == nil || !strings.Contains(err.Error(), `not "carousel"`) {
 		t.Fatalf("expected content mismatch error, got %v", err)
+	}
+}
+
+func TestValidatePresetChecksRequiredFieldsInOrder(t *testing.T) {
+	templateCatalog := testTemplateCatalog(t)
+	preset := Preset{
+		Path:              "preset.json",
+		Name:              "",
+		Description:       "",
+		ContentType:       "carousel",
+		DefaultTemplateID: "carousel/clean",
+		Steps:             []Step{{Type: StepCreateBrief}},
+		RequiredInputs:    []string{"topic"},
+	}
+
+	err := ValidatePreset(preset, templateCatalog)
+	if err == nil || !strings.Contains(err.Error(), "id is required") {
+		t.Fatalf("expected deterministic id error, got %v", err)
+	}
+
+	preset.ID = "missing-name"
+	err = ValidatePreset(preset, templateCatalog)
+	if err == nil || !strings.Contains(err.Error(), "name is required") {
+		t.Fatalf("expected deterministic name error, got %v", err)
+	}
+}
+
+func TestValidatePresetRejectsMissingRequiredInputs(t *testing.T) {
+	templateCatalog := testTemplateCatalog(t)
+	preset := Preset{
+		Path:              "preset.json",
+		ID:                "missing-inputs",
+		Name:              "Missing Inputs",
+		Description:       "Omits the operator input contract.",
+		ContentType:       "carousel",
+		DefaultTemplateID: "carousel/clean",
+		Steps:             []Step{{Type: StepCreateBrief}},
+	}
+
+	err := ValidatePreset(preset, templateCatalog)
+	if err == nil || !strings.Contains(err.Error(), "required_inputs is required") {
+		t.Fatalf("expected missing required_inputs error, got %v", err)
+	}
+}
+
+func TestCatalogGetOnZeroValueReturnsNotFound(t *testing.T) {
+	_, err := Catalog{}.Get("simple-carousel")
+	if err == nil || !strings.Contains(err.Error(), ErrNotFound.Error()) {
+		t.Fatalf("expected not found error, got %v", err)
 	}
 }
 
