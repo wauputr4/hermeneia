@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"reflect"
 	"strings"
 )
 
@@ -13,7 +14,7 @@ type inputSchema struct {
 	Required   []string               `json:"required"`
 	Properties map[string]inputSchema `json:"properties"`
 	Items      *inputSchema           `json:"items"`
-	Const      any                    `json:"const"`
+	Const      *any                   `json:"const"`
 	Enum       []any                  `json:"enum"`
 	MinItems   *int                   `json:"minItems"`
 	MaxItems   *int                   `json:"maxItems"`
@@ -48,8 +49,8 @@ func validateValue(schema inputSchema, value any, path string) error {
 	if schema.Type != "" && !matchesType(schema.Type, value) {
 		return fmt.Errorf("%s must be %s", path, schema.Type)
 	}
-	if schema.Const != nil && !jsonEqual(schema.Const, value) {
-		return fmt.Errorf("%s must equal %v", path, schema.Const)
+	if schema.Const != nil && !jsonEqual(*schema.Const, value) {
+		return fmt.Errorf("%s must equal %s", path, jsonValue(*schema.Const))
 	}
 	if len(schema.Enum) > 0 && !containsJSONValue(schema.Enum, value) {
 		return fmt.Errorf("%s must be one of %s", path, enumValues(schema.Enum))
@@ -128,23 +129,23 @@ func containsJSONValue(values []any, value any) bool {
 }
 
 func jsonEqual(a, b any) bool {
-	left, err := json.Marshal(a)
-	if err != nil {
-		return false
-	}
-	right, err := json.Marshal(b)
-	if err != nil {
-		return false
-	}
-	return bytes.Equal(left, right)
+	return reflect.DeepEqual(a, b)
 }
 
 func enumValues(values []any) string {
 	parts := make([]string, 0, len(values))
 	for _, value := range values {
-		parts = append(parts, fmt.Sprint(value))
+		parts = append(parts, jsonValue(value))
 	}
 	return strings.Join(parts, ", ")
+}
+
+func jsonValue(value any) string {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return fmt.Sprint(value)
+	}
+	return string(data)
 }
 
 func formatNumber(value float64) string {

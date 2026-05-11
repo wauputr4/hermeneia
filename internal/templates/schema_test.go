@@ -57,3 +57,27 @@ func TestValidateInputRejectsArrayLimit(t *testing.T) {
 		t.Fatalf("expected maxItems error, got %v", err)
 	}
 }
+
+func TestValidateInputAcceptsNullConst(t *testing.T) {
+	manifest := Manifest{
+		ID:          "carousel/null-const",
+		InputSchema: []byte(`{"type":"object","properties":{"optional":{"const":null}}}`),
+	}
+
+	err := ValidateInput(manifest, map[string]any{"optional": nil})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestValidateInputFormatsEnumValuesAsJSON(t *testing.T) {
+	manifest := Manifest{
+		ID:          "carousel/enum",
+		InputSchema: []byte(`{"type":"object","properties":{"slide":{"enum":[{"type":"cover"},"closing"]}}}`),
+	}
+
+	err := ValidateInput(manifest, map[string]any{"slide": map[string]any{"type": "point"}})
+	if err == nil || !strings.Contains(err.Error(), `$.slide must be one of {"type":"cover"}, "closing"`) {
+		t.Fatalf("expected JSON-formatted enum error, got %v", err)
+	}
+}
