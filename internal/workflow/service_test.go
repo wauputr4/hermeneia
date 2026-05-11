@@ -16,6 +16,7 @@ import (
 
 	"github.com/wauputr4/hermeneia/internal/runfiles"
 	"github.com/wauputr4/hermeneia/internal/storage"
+	"github.com/wauputr4/hermeneia/internal/templates"
 )
 
 func TestServiceCreateReviseAndRenderCarouselRun(t *testing.T) {
@@ -459,6 +460,118 @@ func TestServiceListsAndValidatesTemplates(t *testing.T) {
 	if err == nil || !errors.Is(err, ErrInvalidInput) || !strings.Contains(err.Error(), "template not found") {
 		t.Fatalf("expected unknown template validation error, got %v", err)
 	}
+	_, err = service.CreateRun(ctx, CreateInput{Topic: "AI agents", ContentType: "carousel", TemplateID: "video/ai-news-short"})
+	if err == nil || !errors.Is(err, ErrInvalidInput) || !strings.Contains(err.Error(), "not \"carousel\"") {
+		t.Fatalf("expected incompatible template validation error, got %v", err)
+	}
+}
+
+func TestServiceCreateRunValidatesTemplateRequiredInput(t *testing.T) {
+	ctx := context.Background()
+	db, err := storage.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := storage.Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+
+	root := t.TempDir()
+	writeWorkflowTestManifest(t, root, "carousel/strict", `{
+  "id": "carousel/strict",
+  "name": "Strict Carousel",
+  "content_type": "carousel",
+  "description": "Requires a field the default carousel content does not provide.",
+  "version": "1.0.0",
+  "aspect_ratio": "4:5",
+  "renderer": "go-png",
+  "output_kinds": ["content_json", "carousel_png"],
+  "input_schema": {"type":"object","required":["template","missing_field"]}
+}`)
+	catalog, err := templates.LoadRoots([]string{root})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	service := NewService(storage.NewRepository(db), runfiles.New(t.TempDir()))
+	service.Templates = catalog
+	_, err = service.CreateRun(ctx, CreateInput{Topic: "AI agents", ContentType: "carousel", TemplateID: "carousel/strict"})
+	if err == nil || !errors.Is(err, ErrInvalidInput) || !strings.Contains(err.Error(), "$.missing_field is required") {
+		t.Fatalf("expected template input validation error, got %v", err)
+	}
+}
+
+func TestServiceCreateRunValidatesVideoTemplateInput(t *testing.T) {
+	ctx := context.Background()
+	db, err := storage.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := storage.Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+
+	service := NewService(storage.NewRepository(db), runfiles.New(t.TempDir()))
+	_, err = service.CreateRun(ctx, CreateInput{Topic: "AI agents", ContentType: "short_video", TemplateID: "video/ai-news-short"})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestServiceRenderRunValidatesTemplateLimitsBeforeWritingArtifacts(t *testing.T) {
+	ctx := context.Background()
+	db, err := storage.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := storage.Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+
+	root := t.TempDir()
+	writeWorkflowTestManifest(t, root, "carousel/limited", limitedCarouselManifest("carousel/limited", 10))
+	catalog, err := templates.LoadRoots([]string{root})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	service := NewService(storage.NewRepository(db), runfiles.New(t.TempDir()))
+	service.Templates = catalog
+	service.NewID = func(prefix, seed string) string {
+		if prefix == "run" {
+			return "run-limited"
+		}
+		return prefix + "-limited"
+	}
+	created, err := service.CreateRun(ctx, CreateInput{Topic: "AI agents", ContentType: "carousel", TemplateID: "carousel/limited"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	writeWorkflowTestManifest(t, root, "carousel/limited", limitedCarouselManifest("carousel/limited", 1))
+	catalog, err = templates.LoadRoots([]string{root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.Templates = catalog
+
+	_, err = service.RenderRun(ctx, created.Run.ID)
+	if err == nil || !errors.Is(err, ErrInvalidInput) || !strings.Contains(err.Error(), "$.slides must contain at most 1") {
+		t.Fatalf("expected render input validation error, got %v", err)
+	}
+	if _, statErr := os.Stat(service.Files.ContentPath(created.Run.ID)); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("content should not be written before validation, stat err=%v", statErr)
+	}
+	artifacts, listErr := service.Repo.ListArtifactsByRun(ctx, created.Run.ID)
+	if listErr != nil {
+		t.Fatal(listErr)
+	}
+	if len(artifacts) != 0 {
+		t.Fatalf("expected no artifacts after validation failure, got %#v", artifacts)
+	}
 }
 
 func TestServiceShowRunRequiresExistingRun(t *testing.T) {
@@ -475,4 +588,38 @@ func TestServiceShowRunRequiresExistingRun(t *testing.T) {
 	if _, err := service.ShowRun(ctx, "missing"); err != sql.ErrNoRows {
 		t.Fatalf("expected sql.ErrNoRows, got %v", err)
 	}
+}
+
+func writeWorkflowTestManifest(t *testing.T, root, id, body string) {
+	t.Helper()
+	fullDir := filepath.Join(root, filepath.FromSlash(id))
+	if err := os.MkdirAll(fullDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(fullDir, "template.json"), []byte(body+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func limitedCarouselManifest(id string, maxSlides int) string {
+	return fmt.Sprintf(`{
+  "id": %q,
+  "name": "Limited Carousel",
+  "content_type": "carousel",
+  "description": "A carousel manifest with a slide limit.",
+  "version": "1.0.0",
+  "aspect_ratio": "4:5",
+  "renderer": "go-png",
+  "output_kinds": ["content_json", "carousel_png"],
+  "input_schema": {
+    "type": "object",
+    "required": ["template", "slides", "caption", "hashtags"],
+    "properties": {
+      "template": {"const": %q},
+      "slides": {"type": "array", "minItems": 1, "maxItems": %d},
+      "caption": {"type": "string"},
+      "hashtags": {"type": "array"}
+    }
+  }
+}`, id, id, maxSlides)
 }

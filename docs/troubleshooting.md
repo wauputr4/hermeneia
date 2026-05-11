@@ -189,6 +189,18 @@ Notes:
 - Duplicate template IDs across built-in and custom roots fail instead of overriding an existing template.
 - `preview_asset` and `assets` entries must stay inside the template directory; absolute paths and `../` traversal are rejected.
 
+## 2026-05-11 — Template input schema validation
+
+Hermeneia validates the rendered structured input against a manifest's
+`input_schema` before run creation and again before `render` writes
+`content.json` or output artifacts.
+
+Notes:
+
+- The supported schema subset is intentionally small: `type`, `required`, `properties`, `items`, `minItems`, `maxItems`, `const`, `enum`, and numeric `minimum`.
+- Use `maxItems` on carousel `slides` or video `scenes` to fail fast before partial render output is written.
+- Validation errors are returned through the CLI and HTTP API as normal invalid-input errors.
+
 ## 2026-05-10 — API-driven Web UI template gallery
 
 The Web UI create-run form loads templates from `GET /v1/templates` instead of
