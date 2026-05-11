@@ -190,6 +190,9 @@ func (s Service) CreateRun(ctx context.Context, input CreateInput) (CreateResult
 	templateID := template.ID
 
 	b := draftBrief(input, contentType, templateID)
+	if err := validateTemplateInput(template, contentType, b); err != nil {
+		return CreateResult{}, err
+	}
 	return s.createRunWithBrief(ctx, input, contentType, template, b, fmt.Sprintf("- v1 created from topic %q.\n", b.Topic))
 }
 
@@ -295,6 +298,9 @@ func (s Service) CreateRunFromResearch(ctx context.Context, input ResearchInput)
 		return ResearchResult{}, err
 	}
 	initialBrief := draftBriefFromResearch(createInput, plan)
+	if err := validateTemplateInput(template, contentType, initialBrief); err != nil {
+		return ResearchResult{}, err
+	}
 	created, err := s.createRunWithBrief(ctx, createInput, contentType, template, initialBrief, fmt.Sprintf("- v1 created from research topic %q.\n", strings.TrimSpace(input.Topic)))
 	if err != nil {
 		return ResearchResult{}, err
@@ -509,10 +515,17 @@ func (s Service) RenderRun(ctx context.Context, runID string) (RenderResult, err
 
 	var content any
 	var files []render.OutputFile
+	template, err := s.resolveTemplate(run.ContentType, run.TemplateID)
+	if err != nil {
+		return RenderResult{}, err
+	}
 	switch run.ContentType {
 	case ContentTypeCarousel:
 		carousel := render.BuildCarouselContent(b, run.TemplateID)
 		content = carousel
+		if err := templates.ValidateInput(template, carousel); err != nil {
+			return RenderResult{}, invalidInput(err.Error())
+		}
 		if err := runfiles.WriteJSON(s.Files.ContentPath(runID), carousel); err != nil {
 			return RenderResult{}, err
 		}
@@ -520,6 +533,9 @@ func (s Service) RenderRun(ctx context.Context, runID string) (RenderResult, err
 	case ContentTypeShortVideo:
 		video := render.BuildVideoContent(b, run.TemplateID)
 		content = video
+		if err := templates.ValidateInput(template, video); err != nil {
+			return RenderResult{}, invalidInput(err.Error())
+		}
 		if err := runfiles.WriteJSON(s.Files.ContentPath(runID), video); err != nil {
 			return RenderResult{}, err
 		}
@@ -932,6 +948,22 @@ func marshalBrief(b brief.Brief) (string, error) {
 		return "", err
 	}
 	return string(data), nil
+}
+
+func validateTemplateInput(manifest templates.Manifest, contentType string, b brief.Brief) error {
+	switch contentType {
+	case ContentTypeCarousel:
+		if err := templates.ValidateInput(manifest, render.BuildCarouselContent(b, manifest.ID)); err != nil {
+			return invalidInput(err.Error())
+		}
+	case ContentTypeShortVideo:
+		if err := templates.ValidateInput(manifest, render.BuildVideoContent(b, manifest.ID)); err != nil {
+			return invalidInput(err.Error())
+		}
+	default:
+		return invalidInput(fmt.Sprintf("unsupported content type %q", contentType))
+	}
+	return nil
 }
 
 func normalizeContentType(value string) (string, error) {

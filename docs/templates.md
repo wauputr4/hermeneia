@@ -184,6 +184,19 @@ This keeps rendering deterministic and easier to revise. The manifest
 `input_schema` documents that structured payload for CLI, API, Web UI, and
 future custom template loaders.
 
+Hermeneia validates template input with a deliberately small JSON Schema-style
+subset before creating runs and before rendering artifacts. Supported keywords:
+
+- `type`: `object`, `array`, `string`, `integer`, `number`, or `boolean`
+- `required` for object fields
+- `properties` for object field schemas
+- `items`, `minItems`, and `maxItems` for arrays
+- `const` and `enum` for exact allowed values
+- `minimum` for numeric lower bounds
+
+Unsupported schema keywords are rejected during validation so template authors
+can see contract drift early instead of assuming a rule is enforced.
+
 ## AI Image Generation
 
 AI image generation or editing should be used as a supporting step:
