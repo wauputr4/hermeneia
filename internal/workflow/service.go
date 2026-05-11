@@ -364,7 +364,7 @@ func (s Service) GetTemplate(ctx context.Context, id string) (templates.Manifest
 	return catalog.Get(id)
 }
 
-func (s Service) ListWorkflowPresets(ctx context.Context) ([]workflows.Preset, error) {
+func (s *Service) ListWorkflowPresets(ctx context.Context) ([]workflows.Preset, error) {
 	catalog, err := s.workflowCatalog()
 	if err != nil {
 		return nil, err
@@ -372,7 +372,7 @@ func (s Service) ListWorkflowPresets(ctx context.Context) ([]workflows.Preset, e
 	return catalog.All(), nil
 }
 
-func (s Service) GetWorkflowPreset(ctx context.Context, id string) (workflows.Preset, error) {
+func (s *Service) GetWorkflowPreset(ctx context.Context, id string) (workflows.Preset, error) {
 	catalog, err := s.workflowCatalog()
 	if err != nil {
 		return workflows.Preset{}, err
@@ -1019,7 +1019,7 @@ func (s Service) resolveTemplate(contentType, templateID string) (templates.Mani
 	return manifest, nil
 }
 
-func (s Service) templateCatalog() (templates.Catalog, error) {
+func (s *Service) templateCatalog() (templates.Catalog, error) {
 	catalog := s.Templates
 	if catalog.Len() > 0 {
 		return catalog, nil
@@ -1028,10 +1028,11 @@ func (s Service) templateCatalog() (templates.Catalog, error) {
 	if err != nil {
 		return templates.Catalog{}, fmt.Errorf("load templates: %w", err)
 	}
+	s.Templates = catalog
 	return catalog, nil
 }
 
-func (s Service) workflowCatalog() (workflows.Catalog, error) {
+func (s *Service) workflowCatalog() (workflows.Catalog, error) {
 	catalog := s.Workflows
 	if catalog.Len() > 0 {
 		return catalog, nil
@@ -1044,6 +1045,7 @@ func (s Service) workflowCatalog() (workflows.Catalog, error) {
 	if err != nil {
 		return workflows.Catalog{}, fmt.Errorf("load workflows: %w", err)
 	}
+	s.Workflows = catalog
 	return catalog, nil
 }
 

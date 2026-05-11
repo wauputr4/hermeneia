@@ -209,11 +209,12 @@ func findBuiltInRoot() (string, error) {
 func hasPresetFile(root string) bool {
 	found := false
 	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil || found {
+		if err != nil {
 			return nil
 		}
 		if !d.IsDir() && filepath.Ext(path) == ".json" {
 			found = true
+			return filepath.SkipAll
 		}
 		return nil
 	})

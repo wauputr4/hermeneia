@@ -17,6 +17,7 @@ import (
 	"github.com/wauputr4/hermeneia/internal/runfiles"
 	"github.com/wauputr4/hermeneia/internal/storage"
 	"github.com/wauputr4/hermeneia/internal/templates"
+	"github.com/wauputr4/hermeneia/internal/workflows"
 )
 
 func TestServiceCreateReviseAndRenderCarouselRun(t *testing.T) {
@@ -491,6 +492,31 @@ func TestServiceListsAndGetsWorkflowPresets(t *testing.T) {
 	}
 	if preset.DefaultTemplateID != "carousel/ai-news-clean" || len(preset.Steps) != 3 || len(preset.RequiredInputs) == 0 {
 		t.Fatalf("unexpected workflow preset: %#v", preset)
+	}
+}
+
+func TestServiceCachesLazyWorkflowCatalog(t *testing.T) {
+	ctx := context.Background()
+	db, err := storage.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := storage.Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+
+	service := NewService(storage.NewRepository(db), runfiles.New(t.TempDir()))
+	service.Workflows = workflows.Catalog{}
+	if service.Workflows.Len() != 0 {
+		t.Fatalf("expected empty test workflow catalog, got %d", service.Workflows.Len())
+	}
+
+	if _, err := service.ListWorkflowPresets(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if service.Workflows.Len() != 2 {
+		t.Fatalf("expected workflow catalog to be cached after lazy load, got %d", service.Workflows.Len())
 	}
 }
 
