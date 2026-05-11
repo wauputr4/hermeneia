@@ -258,6 +258,36 @@ func TestServerTemplateCatalogIncludesCustomRoots(t *testing.T) {
 	}
 }
 
+func TestServerWorkflowCatalog(t *testing.T) {
+	handler := newTestHandler(t)
+
+	list := request(t, handler, http.MethodGet, "/v1/workflows", "")
+	assertStatus(t, list, http.StatusOK)
+	var listed struct {
+		Workflows []workflowPresetResponse `json:"workflows"`
+	}
+	decodeResponse(t, list, &listed)
+	if len(listed.Workflows) != 2 {
+		t.Fatalf("expected built-in workflows, got %#v", listed.Workflows)
+	}
+	if listed.Workflows[0].ID == "" || len(listed.Workflows[0].Steps) == 0 || len(listed.Workflows[0].RequiredInputs) == 0 {
+		t.Fatalf("unexpected workflow list response: %#v", listed.Workflows)
+	}
+
+	show := request(t, handler, http.MethodGet, "/v1/workflows/research-carousel", "")
+	assertStatus(t, show, http.StatusOK)
+	var detail struct {
+		Workflow workflowPresetResponse `json:"workflow"`
+	}
+	decodeResponse(t, show, &detail)
+	if detail.Workflow.ID != "research-carousel" || detail.Workflow.DefaultTemplateID != "carousel/ai-news-clean" || len(detail.Workflow.Steps) != 3 {
+		t.Fatalf("unexpected workflow detail: %#v", detail.Workflow)
+	}
+
+	missing := request(t, handler, http.MethodGet, "/v1/workflows/missing", "")
+	assertStatus(t, missing, http.StatusNotFound)
+}
+
 func TestWriteServiceErrorStatusMapping(t *testing.T) {
 	tests := []struct {
 		name string

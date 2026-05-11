@@ -75,6 +75,42 @@ Template IDs contain slashes, so a detail request uses the natural path form,
 for example `GET /v1/templates/carousel/ai-news-clean`. Unknown template IDs
 return `404 Not Found`.
 
+### List Workflow Presets
+
+```http
+GET /v1/workflows
+```
+
+Returns built-in workflow preset metadata and stable step definitions:
+
+```json
+{
+  "workflows": [
+    {
+      "id": "research-carousel",
+      "name": "Research to Carousel",
+      "description": "Create a carousel from traceable source URLs and render it.",
+      "content_type": "carousel",
+      "default_template_id": "carousel/ai-news-clean",
+      "steps": [
+        {"type": "research_plan"},
+        {"type": "create_brief"},
+        {"type": "render"}
+      ],
+      "required_inputs": ["topic", "sources"]
+    }
+  ]
+}
+```
+
+### Get Workflow Preset
+
+```http
+GET /v1/workflows/{workflow_id}
+```
+
+Unknown workflow preset IDs return `404 Not Found`.
+
 ### List Runs
 
 ```http

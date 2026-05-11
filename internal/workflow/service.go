@@ -19,6 +19,7 @@ import (
 	"github.com/wauputr4/hermeneia/internal/runfiles"
 	"github.com/wauputr4/hermeneia/internal/storage"
 	"github.com/wauputr4/hermeneia/internal/templates"
+	"github.com/wauputr4/hermeneia/internal/workflows"
 )
 
 const (
@@ -57,6 +58,7 @@ type Service struct {
 	Video     VideoRenderer
 	Planner   ResearchPlanner
 	Templates templates.Catalog
+	Workflows workflows.Catalog
 	Now       func() time.Time
 	NewID     func(prefix, seed string) string
 }
@@ -171,6 +173,9 @@ func NewService(repo *storage.Repository, files runfiles.Store) Service {
 	}
 	if catalog, err := templates.LoadConfigured(); err == nil {
 		service.Templates = catalog
+		if workflowCatalog, err := workflows.LoadBuiltIn(catalog); err == nil {
+			service.Workflows = workflowCatalog
+		}
 	}
 	return service
 }
@@ -355,6 +360,22 @@ func (s Service) GetTemplate(ctx context.Context, id string) (templates.Manifest
 	catalog, err := s.templateCatalog()
 	if err != nil {
 		return templates.Manifest{}, err
+	}
+	return catalog.Get(id)
+}
+
+func (s Service) ListWorkflowPresets(ctx context.Context) ([]workflows.Preset, error) {
+	catalog, err := s.workflowCatalog()
+	if err != nil {
+		return nil, err
+	}
+	return catalog.All(), nil
+}
+
+func (s Service) GetWorkflowPreset(ctx context.Context, id string) (workflows.Preset, error) {
+	catalog, err := s.workflowCatalog()
+	if err != nil {
+		return workflows.Preset{}, err
 	}
 	return catalog.Get(id)
 }
@@ -1006,6 +1027,22 @@ func (s Service) templateCatalog() (templates.Catalog, error) {
 	catalog, err := templates.LoadConfigured()
 	if err != nil {
 		return templates.Catalog{}, fmt.Errorf("load templates: %w", err)
+	}
+	return catalog, nil
+}
+
+func (s Service) workflowCatalog() (workflows.Catalog, error) {
+	catalog := s.Workflows
+	if catalog.Len() > 0 {
+		return catalog, nil
+	}
+	templateCatalog, err := s.templateCatalog()
+	if err != nil {
+		return workflows.Catalog{}, err
+	}
+	catalog, err = workflows.LoadBuiltIn(templateCatalog)
+	if err != nil {
+		return workflows.Catalog{}, fmt.Errorf("load workflows: %w", err)
 	}
 	return catalog, nil
 }

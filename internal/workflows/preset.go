@@ -51,6 +51,14 @@ type Catalog struct {
 	byID  map[string]Preset
 }
 
+func LoadBuiltIn(templateCatalog templates.Catalog) (Catalog, error) {
+	root, err := findBuiltInRoot()
+	if err != nil {
+		return Catalog{}, err
+	}
+	return LoadDir(root, templateCatalog)
+}
+
 func LoadDir(root string, templateCatalog templates.Catalog) (Catalog, error) {
 	var paths []string
 	if err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -139,6 +147,10 @@ func (c Catalog) All() []Preset {
 	return out
 }
 
+func (c Catalog) Len() int {
+	return len(c.items)
+}
+
 func (c Catalog) Get(id string) (Preset, error) {
 	id = strings.TrimSpace(id)
 	if c.byID == nil {
@@ -173,6 +185,39 @@ func supportedContentType(contentType string) bool {
 	default:
 		return false
 	}
+}
+
+func findBuiltInRoot() (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	for {
+		candidate := filepath.Join(dir, "workflows")
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() && hasPresetFile(candidate) {
+			return candidate, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return "", errors.New("built-in workflows directory not found")
+}
+
+func hasPresetFile(root string) bool {
+	found := false
+	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || found {
+			return nil
+		}
+		if !d.IsDir() && filepath.Ext(path) == ".json" {
+			found = true
+		}
+		return nil
+	})
+	return found
 }
 
 func supportedStepType(stepType string) bool {

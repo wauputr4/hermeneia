@@ -86,3 +86,16 @@ The `internal/workflows` validator rejects:
 
 Existing manual CLI and HTTP API operations remain unchanged. Presets are a
 contract layer for upcoming CLI/API catalog exposure and UI workflow selection.
+
+## Catalog Surfaces
+
+Workflow presets are discoverable through:
+
+- CLI: `hermeneia workflows`
+- HTTP API: `GET /v1/workflows`
+- HTTP API: `GET /v1/workflows/{workflow_id}`
+
+Catalog responses include preset IDs, content types, default template IDs,
+ordered step definitions, and required input names. Run creation does not accept
+`workflow_id` yet; execution remains a later slice so this catalog API can stay
+read-only and stable first.

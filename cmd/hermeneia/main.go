@@ -72,6 +72,8 @@ func (c command) run(ctx context.Context, args []string) error {
 		return c.research(ctx, args[1:])
 	case "templates":
 		return c.templates(ctx, args[1:])
+	case "workflows":
+		return c.workflows(ctx, args[1:])
 	case "list":
 		return c.list(ctx, args[1:])
 	case "show":
@@ -128,6 +130,32 @@ func (c command) research(ctx context.Context, args []string) error {
 		}
 		fmt.Fprintf(c.stdout, "created research run %s\nresearch %s\nbrief %s\n", result.Run.ID, result.ResearchPath, result.BriefPath)
 		return nil
+	})
+}
+
+func (c command) workflows(ctx context.Context, args []string) error {
+	fs := c.flagSet("workflows")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() > 0 {
+		return fmt.Errorf("workflows does not accept positional arguments")
+	}
+	return c.withService(ctx, func(s workflow.Service) error {
+		presets, err := s.ListWorkflowPresets(ctx)
+		if err != nil {
+			return err
+		}
+		if len(presets) == 0 {
+			fmt.Fprintln(c.stdout, "no workflow presets found")
+			return nil
+		}
+		w := tabwriter.NewWriter(c.stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "ID\tTYPE\tTEMPLATE\tSTEPS\tDESCRIPTION")
+		for _, preset := range presets {
+			fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\n", preset.ID, preset.ContentType, preset.DefaultTemplateID, len(preset.Steps), preset.Description)
+		}
+		return w.Flush()
 	})
 }
 
@@ -556,6 +584,7 @@ Usage:
   hermeneia create            create a content run
   hermeneia research          create a run from traceable research sources
   hermeneia templates         list available templates
+  hermeneia workflows         list available workflow presets
   hermeneia list              list content runs
   hermeneia show              show a content run
   hermeneia revise            create a new brief revision
@@ -574,6 +603,7 @@ Configuration:
 Examples:
   hermeneia create --topic "AI agents in marketing" --type carousel
   hermeneia templates
+  hermeneia workflows
   hermeneia research --topic "AI agents" --source "https://example.com/news"
   hermeneia revise <run-id> --instruction "Make the hook sharper"
   hermeneia render <run-id>

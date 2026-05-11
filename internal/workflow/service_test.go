@@ -466,6 +466,34 @@ func TestServiceListsAndValidatesTemplates(t *testing.T) {
 	}
 }
 
+func TestServiceListsAndGetsWorkflowPresets(t *testing.T) {
+	ctx := context.Background()
+	db, err := storage.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := storage.Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+
+	service := NewService(storage.NewRepository(db), runfiles.New(t.TempDir()))
+	presets, err := service.ListWorkflowPresets(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(presets) != 2 {
+		t.Fatalf("expected built-in workflow presets, got %#v", presets)
+	}
+	preset, err := service.GetWorkflowPreset(ctx, "research-carousel")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if preset.DefaultTemplateID != "carousel/ai-news-clean" || len(preset.Steps) != 3 || len(preset.RequiredInputs) == 0 {
+		t.Fatalf("unexpected workflow preset: %#v", preset)
+	}
+}
+
 func TestServiceCreateRunValidatesTemplateRequiredInput(t *testing.T) {
 	ctx := context.Background()
 	db, err := storage.Open(":memory:")

@@ -26,6 +26,7 @@ func TestHelpOutputIncludesMVPCommandSurface(t *testing.T) {
 		"hermeneia create",
 		"hermeneia research",
 		"hermeneia templates",
+		"hermeneia workflows",
 		"hermeneia list",
 		"hermeneia show",
 		"hermeneia revise",
@@ -37,6 +38,24 @@ func TestHelpOutputIncludesMVPCommandSurface(t *testing.T) {
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("help output does not include %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestCLIWorkflowsListsBuiltInCatalog(t *testing.T) {
+	var stdout bytes.Buffer
+	dbPath := filepath.Join(t.TempDir(), "hermeneia.db")
+	t.Setenv("HERMENEIA_DATABASE_PATH", dbPath)
+
+	cmd := command{stdout: &stdout}
+	if err := cmd.run(context.Background(), []string{"workflows"}); err != nil {
+		t.Fatal(err)
+	}
+
+	output := stdout.String()
+	for _, want := range []string{"ID", "TYPE", "TEMPLATE", "STEPS", "simple-carousel", "research-carousel", "carousel/ai-news-clean"} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("workflows output missing %q:\n%s", want, output)
 		}
 	}
 }
