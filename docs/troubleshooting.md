@@ -216,6 +216,18 @@ Notes:
 - Use `hermeneia workflows`, `GET /v1/workflows`, or `GET /v1/workflows/{workflow_id}` to inspect built-in preset metadata. Preset execution is intentionally separate from this read-only catalog slice.
 - Built-in workflow discovery stops scanning once it finds a preset JSON file, and the workflow service caches lazy-loaded preset catalogs on the service instance. If repeated CLI/API workflow catalog calls look slow, confirm callers keep a stable service instance instead of constructing one per request.
 
+## 2026-05-11 — Web UI workflow selector and timeline
+
+The Web UI workflow selector uses the read-only workflow catalog. Selecting a
+preset should update the create form's content type and default template, but it
+must not send `workflow_id` to `POST /v1/runs` until backend workflow execution
+is implemented.
+
+The run detail step timeline is derived from existing detail response data. If a
+step looks wrong, inspect the run's brief versions, `research_json` artifact,
+render artifacts, revision events, and `scheduled_posts` payload before changing
+the UI state model.
+
 ## 2026-05-10 — API-driven Web UI template gallery
 
 The Web UI create-run form loads templates from `GET /v1/templates` instead of
