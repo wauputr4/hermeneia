@@ -25,6 +25,23 @@ The built-in loader scans local `template.json` files deterministically and
 rejects duplicate IDs, missing required fields, unsupported content types, and
 ID/path mismatches.
 
+Additional local template roots can be supplied without editing the repository:
+
+```bash
+HERMENEIA_TEMPLATE_PATH=/path/to/templates:/another/templates hermeneia templates
+```
+
+Each custom root uses the same folder contract as the built-in `templates/`
+directory. For example, `HERMENEIA_TEMPLATE_PATH=/opt/hermeneia/templates`
+can expose `/opt/hermeneia/templates/carousel/local-clean/template.json` as
+template ID `carousel/local-clean`.
+
+Hermeneia merges built-in templates first, then custom roots in
+`HERMENEIA_TEMPLATE_PATH` order. Duplicate template IDs fail with a validation
+error instead of overriding built-ins or other custom templates. Empty custom
+roots are ignored so users can keep placeholder template directories configured
+before they add their first manifest.
+
 Hermeneia exposes the same manifest-backed catalog through:
 
 - CLI: `hermeneia templates`
@@ -57,6 +74,9 @@ Optional fields:
 
 - `preview_asset`
 - `assets`
+
+`preview_asset` and `assets` must be relative paths that stay inside the
+template directory. Absolute paths and `../` traversal are rejected.
 
 Example:
 

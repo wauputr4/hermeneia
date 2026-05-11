@@ -90,6 +90,102 @@ func TestLoadDirRejectsDuplicateIDs(t *testing.T) {
 	}
 }
 
+func TestLoadRootsMergesMultipleTemplateRoots(t *testing.T) {
+	builtIn := t.TempDir()
+	custom := t.TempDir()
+	writeManifest(t, builtIn, "carousel/built-in", validManifest("carousel/built-in", "carousel"))
+	writeManifest(t, custom, "video/custom-short", validManifest("video/custom-short", "short_video"))
+
+	catalog, err := LoadRoots([]string{builtIn, custom})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := catalog.Len(); got != 2 {
+		t.Fatalf("expected 2 manifests, got %d", got)
+	}
+	if _, err := catalog.Get("carousel/built-in"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := catalog.Get("video/custom-short"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLoadRootsRejectsDuplicateIDsAcrossRoots(t *testing.T) {
+	first := t.TempDir()
+	second := t.TempDir()
+	writeManifest(t, first, "carousel/duplicate", validManifest("carousel/duplicate", "carousel"))
+	writeManifest(t, second, "carousel/duplicate", validManifest("carousel/duplicate", "carousel"))
+
+	_, err := LoadRoots([]string{first, second})
+	if err == nil || !strings.Contains(err.Error(), first) || !strings.Contains(err.Error(), second) {
+		t.Fatalf("expected duplicate error naming both roots, got %v", err)
+	}
+}
+
+func TestLoadRootsRejectsRootsWithoutManifests(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "carousel", "empty"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_, err := LoadRoots([]string{root})
+	if err == nil || !strings.Contains(err.Error(), "no template manifests found") {
+		t.Fatalf("expected missing manifest error, got %v", err)
+	}
+}
+
+func TestLoadRootsSkipsEmptyRoots(t *testing.T) {
+	first := t.TempDir()
+	empty := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(empty, "carousel", "empty"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeManifest(t, first, "carousel/valid", validManifest("carousel/valid", "carousel"))
+
+	catalog, err := LoadRoots([]string{empty, first})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := catalog.Len(); got != 1 {
+		t.Fatalf("expected one manifest after skipping empty root, got %d", got)
+	}
+	if _, err := catalog.Get("carousel/valid"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLoadConfiguredIncludesEnvTemplatePath(t *testing.T) {
+	root := t.TempDir()
+	custom := t.TempDir()
+	writeManifest(t, filepath.Join(root, "templates"), "carousel/built-in", validManifest("carousel/built-in", "carousel"))
+	writeManifest(t, custom, "carousel/custom", validManifest("carousel/custom", "carousel"))
+
+	previous, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Chdir(previous); err != nil {
+			t.Fatalf("restore cwd: %v", err)
+		}
+	}()
+	t.Setenv("HERMENEIA_TEMPLATE_PATH", custom)
+
+	catalog, err := LoadConfigured()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := catalog.Get("carousel/built-in"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := catalog.Get("carousel/custom"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestLoadDirRejectsUnsupportedContentType(t *testing.T) {
 	root := t.TempDir()
 	writeManifest(t, root, "thread/ai-news", validManifest("thread/ai-news", "thread"))
@@ -107,6 +203,27 @@ func TestLoadDirRejectsIDPathMismatch(t *testing.T) {
 	_, err := LoadDir(root)
 	if err == nil || !strings.Contains(err.Error(), "must map to") {
 		t.Fatalf("expected id path mismatch error, got %v", err)
+	}
+}
+
+func TestLoadDirRejectsAssetPathTraversal(t *testing.T) {
+	root := t.TempDir()
+	writeManifest(t, root, "carousel/traversal", `{
+  "id": "carousel/traversal",
+  "name": "Traversal",
+  "content_type": "carousel",
+  "description": "A manifest with unsafe asset paths.",
+  "version": "1.0.0",
+  "aspect_ratio": "4:5",
+  "renderer": "go-png",
+  "output_kinds": ["carousel_png"],
+  "input_schema": {},
+  "preview_asset": "../preview.png"
+}`)
+
+	_, err := LoadDir(root)
+	if err == nil || !strings.Contains(err.Error(), "must stay inside the template directory") {
+		t.Fatalf("expected path traversal error, got %v", err)
 	}
 }
 

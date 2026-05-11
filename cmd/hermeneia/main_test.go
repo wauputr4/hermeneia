@@ -59,6 +59,27 @@ func TestCLITemplatesListsBuiltInCatalog(t *testing.T) {
 	}
 }
 
+func TestCLITemplatesIncludesCustomTemplatePath(t *testing.T) {
+	var stdout bytes.Buffer
+	dbPath := filepath.Join(t.TempDir(), "hermeneia.db")
+	customRoot := t.TempDir()
+	writeCLITestManifest(t, customRoot, "carousel/custom-local")
+	t.Setenv("HERMENEIA_DATABASE_PATH", dbPath)
+	t.Setenv("HERMENEIA_TEMPLATE_PATH", customRoot)
+
+	cmd := command{stdout: &stdout}
+	if err := cmd.run(context.Background(), []string{"templates"}); err != nil {
+		t.Fatal(err)
+	}
+
+	output := stdout.String()
+	for _, want := range []string{"carousel/ai-news-clean", "video/ai-news-short", "carousel/custom-local"} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("templates output missing %q:\n%s", want, output)
+		}
+	}
+}
+
 func TestUnknownCommandReturnsClearError(t *testing.T) {
 	cmd := command{stdout: &bytes.Buffer{}}
 
@@ -184,6 +205,28 @@ func TestResearchPlannerFromEnvConfiguresReusableHTTPClient(t *testing.T) {
 	}
 	if planner.HTTPClient == nil {
 		t.Fatal("expected reusable HTTP client")
+	}
+}
+
+func writeCLITestManifest(t *testing.T, root, id string) {
+	t.Helper()
+	fullDir := filepath.Join(root, filepath.FromSlash(id))
+	if err := os.MkdirAll(fullDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `{
+  "id": "` + id + `",
+  "name": "Custom Local",
+  "content_type": "carousel",
+  "description": "A custom local template.",
+  "version": "1.0.0",
+  "aspect_ratio": "4:5",
+  "renderer": "go-png",
+  "output_kinds": ["carousel_png"],
+  "input_schema": {}
+}`
+	if err := os.WriteFile(filepath.Join(fullDir, "template.json"), []byte(body+"\n"), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 

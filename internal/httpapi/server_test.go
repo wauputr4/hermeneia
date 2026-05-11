@@ -18,6 +18,7 @@ import (
 	"github.com/wauputr4/hermeneia/internal/render"
 	"github.com/wauputr4/hermeneia/internal/runfiles"
 	"github.com/wauputr4/hermeneia/internal/storage"
+	"github.com/wauputr4/hermeneia/internal/templates"
 	"github.com/wauputr4/hermeneia/internal/workflow"
 )
 
@@ -229,6 +230,34 @@ func TestServerTemplateCatalog(t *testing.T) {
 	assertStatus(t, missing, http.StatusNotFound)
 }
 
+func TestServerTemplateCatalogIncludesCustomRoots(t *testing.T) {
+	customRoot := t.TempDir()
+	writeHTTPTestManifest(t, customRoot, "carousel/custom-local")
+	catalog, err := templates.LoadRoots([]string{filepath.Join("..", "..", "templates"), customRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := newTestService(t)
+	service.Templates = catalog
+	handler := New(service)
+
+	list := request(t, handler, http.MethodGet, "/v1/templates", "")
+	assertStatus(t, list, http.StatusOK)
+	var listed struct {
+		Templates []templateResponse `json:"templates"`
+	}
+	decodeResponse(t, list, &listed)
+	var found bool
+	for _, template := range listed.Templates {
+		if template.ID == "carousel/custom-local" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected custom template in API response: %#v", listed.Templates)
+	}
+}
+
 func TestWriteServiceErrorStatusMapping(t *testing.T) {
 	tests := []struct {
 		name string
@@ -328,6 +357,28 @@ func (fakeCarouselRenderer) Render(ctx context.Context, content render.CarouselC
 		return nil, err
 	}
 	return []render.OutputFile{{Kind: "carousel_png", Path: path}}, nil
+}
+
+func writeHTTPTestManifest(t *testing.T, root, id string) {
+	t.Helper()
+	fullDir := filepath.Join(root, filepath.FromSlash(id))
+	if err := os.MkdirAll(fullDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `{
+  "id": "` + id + `",
+  "name": "Custom Local",
+  "content_type": "carousel",
+  "description": "A custom local template.",
+  "version": "1.0.0",
+  "aspect_ratio": "4:5",
+  "renderer": "go-png",
+  "output_kinds": ["carousel_png"],
+  "input_schema": {}
+}`
+	if err := os.WriteFile(filepath.Join(fullDir, "template.json"), []byte(body+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func request(t *testing.T, handler http.Handler, method, target, body string) *httptest.ResponseRecorder {
