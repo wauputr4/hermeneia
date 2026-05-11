@@ -30,6 +30,8 @@ Hermeneia exposes the same manifest-backed catalog through:
 - CLI: `hermeneia templates`
 - HTTP API: `GET /v1/templates`
 - HTTP API: `GET /v1/templates/carousel/ai-news-clean`
+- Web UI: the local create-run form fetches `GET /v1/templates`, filters by
+  manifest `content_type`, and displays template metadata before creating a run.
 
 API responses intentionally omit local manifest paths. Manifests are the source
 of truth for template metadata; SQLite stores the selected template ID on runs

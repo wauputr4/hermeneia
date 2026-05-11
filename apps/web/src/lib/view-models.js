@@ -1,8 +1,3 @@
-export const TEMPLATES = [
-	{ id: 'carousel/ai-news-clean', label: 'AI news carousel', type: 'carousel' },
-	{ id: 'video/ai-news-short', label: 'AI news short video', type: 'video' }
-];
-
 export function latestBrief(briefs) {
 	return [...briefs].sort((a, b) => b.version - a.version)[0] ?? null;
 }
@@ -42,8 +37,29 @@ export function runSummary(run, details) {
 	};
 }
 
-export function templateForType(contentType) {
-	return TEMPLATES.find((template) => template.type === contentType)?.id ?? TEMPLATES[0].id;
+export function templatesForType(templates, contentType) {
+	return templates
+		.filter((template) => template.content_type === contentType)
+		.sort((a, b) => templateLabel(a).localeCompare(templateLabel(b)) || a.id.localeCompare(b.id));
+}
+
+export function templateForType(templates, contentType) {
+	return templatesForType(templates, contentType)[0]?.id ?? '';
+}
+
+export function templateLabel(template) {
+	return template.name || template.id;
+}
+
+export function templateContentTypeLabel(contentType) {
+	switch (contentType) {
+		case 'carousel':
+			return 'Carousel';
+		case 'short_video':
+			return 'Short video';
+		default:
+			return contentType;
+	}
 }
 
 const shortDateFormatter = new Intl.DateTimeFormat('en', {

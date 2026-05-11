@@ -53,6 +53,20 @@ export type Artifact = {
 	created_at: string;
 };
 
+export type Template = {
+	id: string;
+	name: string;
+	content_type: string;
+	description: string;
+	version: string;
+	aspect_ratio: string;
+	renderer: string;
+	output_kinds: string[];
+	input_schema: Record<string, unknown>;
+	preview_asset?: string;
+	assets?: string[];
+};
+
 export type RunDetails = {
 	run: ContentRun;
 	briefs: BriefVersion[];
@@ -102,6 +116,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export async function listRuns(): Promise<ContentRun[]> {
 	const response = await request<{ runs: ContentRun[] }>('/v1/runs');
 	return response.runs;
+}
+
+export async function listTemplates(): Promise<Template[]> {
+	const response = await request<{ templates: Template[] }>('/v1/templates');
+	return response.templates;
 }
 
 export function showRun(runID: string): Promise<RunDetails> {
