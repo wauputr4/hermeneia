@@ -213,6 +213,8 @@ Notes:
 - `default_template_id` must reference an installed template whose manifest content type matches the preset content type.
 - Duplicate preset IDs fail validation instead of overriding earlier presets.
 - Required preset fields are validated in a fixed order for deterministic errors. `required_inputs` must be non-empty so upcoming CLI/API/UI catalog consumers know which operator inputs are needed before execution.
+- Use `hermeneia workflows`, `GET /v1/workflows`, or `GET /v1/workflows/{workflow_id}` to inspect built-in preset metadata. Preset execution is intentionally separate from this read-only catalog slice.
+- Built-in workflow discovery stops scanning once it finds a preset JSON file, and the workflow service caches lazy-loaded preset catalogs on the service instance. If repeated CLI/API workflow catalog calls look slow, confirm callers keep a stable service instance instead of constructing one per request.
 
 ## 2026-05-10 — API-driven Web UI template gallery
 

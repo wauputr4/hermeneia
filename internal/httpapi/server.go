@@ -15,6 +15,7 @@ import (
 	"github.com/wauputr4/hermeneia/internal/storage"
 	"github.com/wauputr4/hermeneia/internal/templates"
 	"github.com/wauputr4/hermeneia/internal/workflow"
+	"github.com/wauputr4/hermeneia/internal/workflows"
 )
 
 const maxRequestBodyBytes = 1 << 20
@@ -42,6 +43,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /health", s.handleHealth)
 	s.mux.HandleFunc("GET /v1/templates", s.handleListTemplates)
 	s.mux.HandleFunc("GET /v1/templates/{templateID...}", s.handleGetTemplate)
+	s.mux.HandleFunc("GET /v1/workflows", s.handleListWorkflows)
+	s.mux.HandleFunc("GET /v1/workflows/{workflowID}", s.handleGetWorkflow)
 	s.mux.HandleFunc("GET /v1/runs", s.handleListRuns)
 	s.mux.HandleFunc("POST /v1/runs", s.handleCreateRun)
 	s.mux.HandleFunc("POST /v1/research-runs", s.handleCreateResearchRun)
@@ -80,6 +83,28 @@ func (s *Server) handleGetTemplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"template": newTemplateResponse(manifest)})
+}
+
+func (s *Server) handleListWorkflows(w http.ResponseWriter, r *http.Request) {
+	presets, err := s.service.ListWorkflowPresets(r.Context())
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	out := make([]workflowPresetResponse, 0, len(presets))
+	for _, preset := range presets {
+		out = append(out, newWorkflowPresetResponse(preset))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"workflows": out})
+}
+
+func (s *Server) handleGetWorkflow(w http.ResponseWriter, r *http.Request) {
+	preset, err := s.service.GetWorkflowPreset(r.Context(), r.PathValue("workflowID"))
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"workflow": newWorkflowPresetResponse(preset)})
 }
 
 func (s *Server) handleListRuns(w http.ResponseWriter, r *http.Request) {
@@ -404,6 +429,27 @@ type templateResponse struct {
 	Assets       []string        `json:"assets,omitempty"`
 }
 
+type workflowPresetResponse struct {
+	ID                string                  `json:"id"`
+	Name              string                  `json:"name"`
+	Description       string                  `json:"description"`
+	ContentType       string                  `json:"content_type"`
+	DefaultTemplateID string                  `json:"default_template_id"`
+	Steps             []workflowStepResponse  `json:"steps"`
+	RequiredInputs    []string                `json:"required_inputs"`
+	RevisionPolicy    *revisionPolicyResponse `json:"revision_policy,omitempty"`
+}
+
+type workflowStepResponse struct {
+	Type string `json:"type"`
+	Name string `json:"name,omitempty"`
+}
+
+type revisionPolicyResponse struct {
+	Mode         string `json:"mode,omitempty"`
+	MaxRevisions int    `json:"max_revisions,omitempty"`
+}
+
 func newTemplateResponse(manifest templates.Manifest) templateResponse {
 	return templateResponse{
 		ID:           manifest.ID,
@@ -418,6 +464,29 @@ func newTemplateResponse(manifest templates.Manifest) templateResponse {
 		PreviewAsset: manifest.PreviewAsset,
 		Assets:       append([]string(nil), manifest.Assets...),
 	}
+}
+
+func newWorkflowPresetResponse(preset workflows.Preset) workflowPresetResponse {
+	steps := make([]workflowStepResponse, 0, len(preset.Steps))
+	for _, step := range preset.Steps {
+		steps = append(steps, workflowStepResponse{Type: step.Type, Name: step.Name})
+	}
+	out := workflowPresetResponse{
+		ID:                preset.ID,
+		Name:              preset.Name,
+		Description:       preset.Description,
+		ContentType:       preset.ContentType,
+		DefaultTemplateID: preset.DefaultTemplateID,
+		Steps:             steps,
+		RequiredInputs:    append([]string(nil), preset.RequiredInputs...),
+	}
+	if preset.RevisionPolicy.Mode != "" || preset.RevisionPolicy.MaxRevisions != 0 {
+		out.RevisionPolicy = &revisionPolicyResponse{
+			Mode:         preset.RevisionPolicy.Mode,
+			MaxRevisions: preset.RevisionPolicy.MaxRevisions,
+		}
+	}
+	return out
 }
 
 func newRunDetailsResponse(details workflow.RunDetails) runDetailsResponse {
@@ -570,7 +639,7 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 }
 
 func writeServiceError(w http.ResponseWriter, err error) {
-	if errors.Is(err, sql.ErrNoRows) || errors.Is(err, os.ErrNotExist) || errors.Is(err, templates.ErrNotFound) {
+	if errors.Is(err, sql.ErrNoRows) || errors.Is(err, os.ErrNotExist) || errors.Is(err, templates.ErrNotFound) || errors.Is(err, workflows.ErrNotFound) {
 		writeError(w, http.StatusNotFound, err)
 		return
 	}
