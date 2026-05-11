@@ -174,6 +174,13 @@ run, inspect brief versions, submit revision instructions, trigger rendering,
 and review artifact metadata. The CLI remains the primary automation surface,
 while the UI provides a local review console for humans.
 
+## Workflow Presets
+
+Workflow presets are JSON contracts for repeatable flows that map to existing
+Hermeneia service steps such as `create_brief`, `research_plan`, and `render`.
+They do not run arbitrary scripts. The initial contract and built-in presets are
+documented in [Workflow Presets](workflows.md).
+
 ## 7. Export
 
 Supported MVP exports:

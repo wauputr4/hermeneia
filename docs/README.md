@@ -10,6 +10,7 @@ This documentation describes the project concept, architecture, MVP scope, roadm
 - [Web UI](web-ui.md)
 - [Technology Stack](tech-stack.md)
 - [Workflow](workflow.md)
+- [Workflow Presets](workflows.md)
 - [Schemas](schemas.md)
 - [Deployment](deployment.md)
 - [Release Process](release.md)
