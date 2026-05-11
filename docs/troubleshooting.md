@@ -176,6 +176,19 @@ The Web UI template picker should treat API catalog data as external input:
 - When loading templates, validate the current `template_id` against templates compatible with the selected `content_type`, not only against the full catalog.
 - Render optional manifest arrays such as `output_kinds` defensively so malformed local template manifests do not crash the create-run form.
 
+## 2026-05-11 — Custom template directories
+
+Set `HERMENEIA_TEMPLATE_PATH` to one or more template roots separated by the
+operating system path-list separator (`:` on Linux/macOS) to add local templates
+alongside built-ins.
+
+Notes:
+
+- Custom roots must contain at least one `template.json`; otherwise catalog loading fails with a clear missing-manifest error.
+- Template IDs still have to map to their manifest path under the root, such as `carousel/local-clean` -> `carousel/local-clean/template.json`.
+- Duplicate template IDs across built-in and custom roots fail instead of overriding an existing template.
+- `preview_asset` and `assets` entries must stay inside the template directory; absolute paths and `../` traversal are rejected.
+
 ## 2026-05-10 — API-driven Web UI template gallery
 
 The Web UI create-run form loads templates from `GET /v1/templates` instead of

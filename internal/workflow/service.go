@@ -169,7 +169,7 @@ func NewService(repo *storage.Repository, files runfiles.Store) Service {
 		Video:    render.VideoRenderer{},
 		Planner:  DeterministicResearchPlanner{},
 	}
-	if catalog, err := templates.LoadBuiltIn(); err == nil {
+	if catalog, err := templates.LoadConfigured(); err == nil {
 		service.Templates = catalog
 	}
 	return service
@@ -971,7 +971,7 @@ func (s Service) templateCatalog() (templates.Catalog, error) {
 	if catalog.Len() > 0 {
 		return catalog, nil
 	}
-	catalog, err := templates.LoadBuiltIn()
+	catalog, err := templates.LoadConfigured()
 	if err != nil {
 		return templates.Catalog{}, fmt.Errorf("load templates: %w", err)
 	}

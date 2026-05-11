@@ -32,6 +32,7 @@ type Manifest struct {
 	PreviewAsset string          `json:"preview_asset,omitempty"`
 	Assets       []string        `json:"assets,omitempty"`
 	Path         string          `json:"-"`
+	Root         string          `json:"-"`
 }
 
 type Catalog struct {
@@ -48,8 +49,99 @@ func LoadBuiltIn() (Catalog, error) {
 	return LoadDir(root)
 }
 
+func LoadConfigured() (Catalog, error) {
+	root, err := findBuiltInRoot()
+	if err != nil {
+		return Catalog{}, err
+	}
+	roots := []string{root}
+	roots = append(roots, TemplateRootsFromEnv()...)
+	return LoadRoots(roots)
+}
+
+func TemplateRootsFromEnv() []string {
+	value := strings.TrimSpace(os.Getenv("HERMENEIA_TEMPLATE_PATH"))
+	if value == "" {
+		return nil
+	}
+	parts := strings.Split(value, string(os.PathListSeparator))
+	roots := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			roots = append(roots, part)
+		}
+	}
+	return roots
+}
+
 func LoadDir(root string) (Catalog, error) {
-	root = filepath.Clean(root)
+	return LoadRoots([]string{root})
+}
+
+func LoadRoots(roots []string) (Catalog, error) {
+	var paths []string
+	pathRoots := make(map[string]string)
+	seenRoots := make(map[string]struct{})
+	for _, root := range roots {
+		root = filepath.Clean(strings.TrimSpace(root))
+		if root == "." || root == "" {
+			continue
+		}
+		if _, ok := seenRoots[root]; ok {
+			continue
+		}
+		seenRoots[root] = struct{}{}
+		rootPaths, err := manifestPaths(root)
+		if err != nil {
+			return Catalog{}, err
+		}
+		if len(rootPaths) == 0 {
+			return Catalog{}, fmt.Errorf("no template manifests found in %s", root)
+		}
+		sort.Strings(rootPaths)
+		for _, path := range rootPaths {
+			pathRoots[filepath.Clean(path)] = root
+		}
+		paths = append(paths, rootPaths...)
+	}
+
+	catalog := Catalog{
+		byID:     make(map[string]Manifest),
+		defaults: make(map[string]string),
+	}
+	var pathErr error
+	for _, path := range paths {
+		manifest, err := loadManifest(path)
+		if err != nil {
+			return Catalog{}, err
+		}
+		manifest.Root = pathRoots[filepath.Clean(path)]
+		if err := validateManifest(manifest); err != nil {
+			return Catalog{}, err
+		}
+		if existing, exists := catalog.byID[manifest.ID]; exists {
+			return Catalog{}, fmt.Errorf("duplicate template id %q in %s conflicts with %s", manifest.ID, manifest.Root, existing.Root)
+		}
+		if err := validateManifestPath(manifest.Root, manifest); err != nil && pathErr == nil {
+			pathErr = err
+		}
+		catalog.byID[manifest.ID] = manifest
+		catalog.items = append(catalog.items, manifest)
+		if _, exists := catalog.defaults[manifest.ContentType]; !exists {
+			catalog.defaults[manifest.ContentType] = manifest.ID
+		}
+	}
+	if pathErr != nil {
+		return Catalog{}, pathErr
+	}
+	if len(catalog.items) == 0 {
+		return Catalog{}, errors.New("no template manifests found")
+	}
+	return catalog, nil
+}
+
+func manifestPaths(root string) ([]string, error) {
 	var paths []string
 	if err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -63,42 +155,9 @@ func LoadDir(root string) (Catalog, error) {
 		}
 		return nil
 	}); err != nil {
-		return Catalog{}, err
+		return nil, err
 	}
-	sort.Strings(paths)
-
-	catalog := Catalog{
-		byID:     make(map[string]Manifest),
-		defaults: make(map[string]string),
-	}
-	var pathErr error
-	for _, path := range paths {
-		manifest, err := loadManifest(path)
-		if err != nil {
-			return Catalog{}, err
-		}
-		if err := validateManifest(manifest); err != nil {
-			return Catalog{}, err
-		}
-		if _, exists := catalog.byID[manifest.ID]; exists {
-			return Catalog{}, fmt.Errorf("duplicate template id %q", manifest.ID)
-		}
-		if err := validateManifestPath(root, manifest); err != nil && pathErr == nil {
-			pathErr = err
-		}
-		catalog.byID[manifest.ID] = manifest
-		catalog.items = append(catalog.items, manifest)
-		if _, exists := catalog.defaults[manifest.ContentType]; !exists {
-			catalog.defaults[manifest.ContentType] = manifest.ID
-		}
-	}
-	if pathErr != nil {
-		return Catalog{}, pathErr
-	}
-	if len(catalog.items) == 0 {
-		return Catalog{}, fmt.Errorf("no template manifests found in %s", root)
-	}
-	return catalog, nil
+	return paths, nil
 }
 
 func (c Catalog) All() []Manifest {
@@ -168,6 +227,14 @@ func validateManifest(manifest Manifest) error {
 	if !supportedContentType(manifest.ContentType) {
 		return fmt.Errorf("%s: unsupported content_type %q", manifest.Path, manifest.ContentType)
 	}
+	if err := validateAssetPath(manifest.Path, "preview_asset", manifest.PreviewAsset); err != nil {
+		return err
+	}
+	for _, asset := range manifest.Assets {
+		if err := validateAssetPath(manifest.Path, "assets", asset); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -175,6 +242,18 @@ func validateManifestPath(root string, manifest Manifest) error {
 	wantPath := filepath.Join(root, filepath.FromSlash(manifest.ID), "template.json")
 	if filepath.Clean(manifest.Path) != filepath.Clean(wantPath) {
 		return fmt.Errorf("%s: id %q must map to %s", manifest.Path, manifest.ID, wantPath)
+	}
+	return nil
+}
+
+func validateAssetPath(manifestPath, field, value string) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	clean := filepath.Clean(filepath.FromSlash(value))
+	if filepath.IsAbs(clean) || clean == "." || clean == ".." || strings.HasPrefix(clean, ".."+string(os.PathSeparator)) {
+		return fmt.Errorf("%s: %s path %q must stay inside the template directory", manifestPath, field, value)
 	}
 	return nil
 }
