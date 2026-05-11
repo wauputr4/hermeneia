@@ -97,7 +97,7 @@ func LoadRoots(roots []string) (Catalog, error) {
 			return Catalog{}, err
 		}
 		if len(rootPaths) == 0 {
-			return Catalog{}, fmt.Errorf("no template manifests found in %s", root)
+			continue
 		}
 		sort.Strings(rootPaths)
 		for _, path := range rootPaths {

@@ -184,7 +184,7 @@ alongside built-ins.
 
 Notes:
 
-- Custom roots must contain at least one `template.json`; otherwise catalog loading fails with a clear missing-manifest error.
+- Custom roots that contain no `template.json` files are ignored; catalog loading only fails with a missing-manifest error when no configured root contributes any templates.
 - Template IDs still have to map to their manifest path under the root, such as `carousel/local-clean` -> `carousel/local-clean/template.json`.
 - Duplicate template IDs across built-in and custom roots fail instead of overriding an existing template.
 - `preview_asset` and `assets` entries must stay inside the template directory; absolute paths and `../` traversal are rejected.

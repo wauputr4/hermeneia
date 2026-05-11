@@ -38,7 +38,9 @@ template ID `carousel/local-clean`.
 
 Hermeneia merges built-in templates first, then custom roots in
 `HERMENEIA_TEMPLATE_PATH` order. Duplicate template IDs fail with a validation
-error instead of overriding built-ins or other custom templates.
+error instead of overriding built-ins or other custom templates. Empty custom
+roots are ignored so users can keep placeholder template directories configured
+before they add their first manifest.
 
 Hermeneia exposes the same manifest-backed catalog through:
 

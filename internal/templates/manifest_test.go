@@ -134,6 +134,26 @@ func TestLoadRootsRejectsRootsWithoutManifests(t *testing.T) {
 	}
 }
 
+func TestLoadRootsSkipsEmptyRoots(t *testing.T) {
+	first := t.TempDir()
+	empty := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(empty, "carousel", "empty"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeManifest(t, first, "carousel/valid", validManifest("carousel/valid", "carousel"))
+
+	catalog, err := LoadRoots([]string{empty, first})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := catalog.Len(); got != 1 {
+		t.Fatalf("expected one manifest after skipping empty root, got %d", got)
+	}
+	if _, err := catalog.Get("carousel/valid"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestLoadConfiguredIncludesEnvTemplatePath(t *testing.T) {
 	root := t.TempDir()
 	custom := t.TempDir()
