@@ -27,7 +27,8 @@ carousel/local-clean -> my-templates/carousel/local-clean/template.json
 ```
 
 Point Hermeneia at one or more custom roots with `HERMENEIA_TEMPLATE_PATH`.
-Use the operating system path-list separator (`:` on Linux/macOS):
+Use the operating system path-list separator (`:` on Linux/macOS, `;` on
+Windows):
 
 ```bash
 HERMENEIA_TEMPLATE_PATH=/absolute/path/to/my-templates hermeneia templates
@@ -154,6 +155,6 @@ not match the manifest, `hermeneia render` fails before writing partial output.
   directory and commit or copy the referenced files.
 - ID/path mismatch: ensure `carousel/local-clean` lives at
   `carousel/local-clean/template.json`.
-- Empty custom root: Hermeneia ignores roots with no `template.json` files, but
-  at least one configured root must contribute a manifest when no built-ins are
-  available.
+- Empty custom root: Hermeneia ignores roots with no `template.json` files.
+  Current releases still require the built-in `templates/` directory to be
+  discoverable before custom roots are merged.

@@ -96,7 +96,7 @@ Or through the local API:
 
 ```bash
 curl http://127.0.0.1:19318/v1/workflows
-curl http://127.0.0.1:19318/v1/workflows/simple-carousel
+curl http://127.0.0.1:19318/v1/workflows/local-simple-carousel
 ```
 
 ## Examples
