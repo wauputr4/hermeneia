@@ -10,7 +10,12 @@ import {
 	templateContentTypeLabel,
 	templateForType,
 	templateLabel,
-	templatesForType
+	templatesForType,
+	workflowForType,
+	workflowLabel,
+	workflowStepLabel,
+	workflowTimeline,
+	workflowsForType
 } from '../src/lib/view-models.js';
 
 describe('web view model helpers', () => {
@@ -95,5 +100,103 @@ describe('web view model helpers', () => {
 
 	it('formats invalid dates without throwing', () => {
 		assert.equal(formatShortDate('not-a-date'), 'n/a');
+	});
+
+	it('filters workflow presets by content type and labels steps', () => {
+		const workflows = [
+			{ id: 'video-flow', name: 'Video Flow', content_type: 'short_video' },
+			{ id: 'simple-carousel', name: 'Simple Carousel', content_type: 'carousel' },
+			{ id: 'fallback-carousel', name: '', content_type: 'carousel' }
+		];
+
+		assert.deepEqual(
+			workflowsForType(workflows, 'carousel').map((workflow) => workflow.id),
+			['fallback-carousel', 'simple-carousel']
+		);
+		assert.equal(workflowForType(workflows, 'short_video'), 'video-flow');
+		assert.equal(workflowLabel({ id: 'fallback-carousel', name: '' }), 'fallback-carousel');
+		assert.equal(workflowStepLabel({ type: 'research_plan' }), 'Research plan');
+	});
+
+	it('derives an empty run workflow timeline', () => {
+		const timeline = workflowTimeline({ briefs: [], revisions: [], artifacts: [], scheduled_posts: [] });
+
+		assert.deepEqual(
+			timeline.map((step) => [step.key, step.status]),
+			[
+				['research', 'pending'],
+				['brief', 'pending'],
+				['revision', 'pending'],
+				['render', 'pending'],
+				['schedule', 'pending']
+			]
+		);
+	});
+
+	it('marks rendered runs in the workflow timeline', () => {
+		const timeline = workflowTimeline({
+			briefs: [{ version: 1, created_at: '2026-05-11T00:00:00Z' }],
+			revisions: [],
+			artifacts: [
+				{ kind: 'content_json', created_at: '2026-05-11T00:01:00Z' },
+				{ kind: 'carousel_png', created_at: '2026-05-11T00:02:00Z' }
+			],
+			scheduled_posts: []
+		});
+
+		assert.equal(timeline.find((step) => step.key === 'brief').status, 'done');
+		assert.equal(timeline.find((step) => step.key === 'render').status, 'done');
+	});
+
+	it('marks revised runs in the workflow timeline', () => {
+		const timeline = workflowTimeline({
+			briefs: [{ version: 1 }, { version: 2 }],
+			revisions: [{ id: 'rev-1', created_at: '2026-05-11T00:03:00Z' }],
+			artifacts: [],
+			scheduled_posts: []
+		});
+
+		const revision = timeline.find((step) => step.key === 'revision');
+		assert.equal(revision.status, 'done');
+		assert.equal(revision.detail, '1 revision saved');
+	});
+
+	it('marks scheduled runs in the workflow timeline', () => {
+		const timeline = workflowTimeline({
+			briefs: [{ version: 1 }],
+			revisions: [],
+			artifacts: [{ kind: 'carousel_png' }],
+			scheduled_posts: [{ id: 'post-1', scheduled_at: '2026-05-12T00:00:00Z' }]
+		});
+
+		const schedule = timeline.find((step) => step.key === 'schedule');
+		assert.equal(schedule.status, 'done');
+		assert.equal(schedule.detail, '1 scheduled post');
+	});
+
+	it('uses latest timeline timestamps from unsorted API responses', () => {
+		const timeline = workflowTimeline({
+			briefs: [
+				{ version: 2, created_at: '2026-05-11T00:05:00Z' },
+				{ version: 1, created_at: '2026-05-11T00:00:00Z' }
+			],
+			revisions: [
+				{ id: 'rev-2', created_at: '2026-05-11T00:06:00Z' },
+				{ id: 'rev-1', created_at: '2026-05-11T00:03:00Z' }
+			],
+			artifacts: [
+				{ kind: 'carousel_png', created_at: '2026-05-11T00:02:00Z' },
+				{ kind: 'caption_text', created_at: '2026-05-11T00:07:00Z' }
+			],
+			scheduled_posts: [
+				{ id: 'post-1', scheduled_at: '2026-05-12T00:00:00Z' },
+				{ id: 'post-2', scheduled_at: '2026-05-13T00:00:00Z' }
+			]
+		});
+
+		assert.equal(timeline.find((step) => step.key === 'brief').at, '2026-05-11T00:05:00Z');
+		assert.equal(timeline.find((step) => step.key === 'revision').at, '2026-05-11T00:06:00Z');
+		assert.equal(timeline.find((step) => step.key === 'render').at, '2026-05-11T00:07:00Z');
+		assert.equal(timeline.find((step) => step.key === 'schedule').at, '2026-05-13T00:00:00Z');
 	});
 });

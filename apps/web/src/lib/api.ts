@@ -53,6 +53,16 @@ export type Artifact = {
 	created_at: string;
 };
 
+export type ScheduledPost = {
+	id: string;
+	run_id: string;
+	artifact_id: string;
+	platform: string;
+	status: string;
+	scheduled_at: string;
+	created_at: string;
+};
+
 export type Template = {
 	id: string;
 	name: string;
@@ -67,11 +77,31 @@ export type Template = {
 	assets?: string[];
 };
 
+export type WorkflowStep = {
+	type: string;
+	name?: string;
+};
+
+export type WorkflowPreset = {
+	id: string;
+	name: string;
+	description: string;
+	content_type: string;
+	default_template_id: string;
+	steps: WorkflowStep[];
+	required_inputs: string[];
+	revision_policy?: {
+		mode?: string;
+		max_revisions?: number;
+	};
+};
+
 export type RunDetails = {
 	run: ContentRun;
 	briefs: BriefVersion[];
 	revisions: RevisionEvent[];
 	artifacts: Artifact[];
+	scheduled_posts: ScheduledPost[];
 };
 
 export type CreateRunInput = {
@@ -121,6 +151,11 @@ export async function listRuns(): Promise<ContentRun[]> {
 export async function listTemplates(): Promise<Template[]> {
 	const response = await request<{ templates: Template[] }>('/v1/templates');
 	return response.templates;
+}
+
+export async function listWorkflows(): Promise<WorkflowPreset[]> {
+	const response = await request<{ workflows: WorkflowPreset[] }>('/v1/workflows');
+	return response.workflows;
 }
 
 export function showRun(runID: string): Promise<RunDetails> {

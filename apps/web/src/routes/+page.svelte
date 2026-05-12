@@ -4,13 +4,15 @@
 		createRun,
 		listTemplates,
 		listRuns,
+		listWorkflows,
 		renderRun,
 		reviseRun,
 		showRun,
 		type BriefVersion,
 		type ContentRun,
 		type RunDetails,
-		type Template
+		type Template,
+		type WorkflowPreset
 	} from '$lib/api';
 	import {
 		artifactGroups,
@@ -21,23 +23,31 @@
 		templateContentTypeLabel,
 		templateForType,
 		templateLabel,
-		templatesForType
+		templatesForType,
+		workflowLabel,
+		workflowStepLabel,
+		workflowTimeline,
+		workflowsForType
 	} from '$lib/view-models.js';
 	import { onMount } from 'svelte';
 
 	let runs = $state<ContentRun[]>([]);
 	let templates = $state<Template[]>([]);
+	let workflows = $state<WorkflowPreset[]>([]);
 	let selectedRunID = $state('');
 	let selectedDetails = $state<RunDetails | null>(null);
 	let selectedBrief = $state<BriefVersion | null>(null);
 	let loading = $state(true);
 	let loadingTemplates = $state(true);
+	let loadingWorkflows = $state(true);
 	let busy = $state(false);
 	let error = $state('');
 	let templateError = $state('');
+	let workflowError = $state('');
 	let notice = $state('');
 	let revisionInstruction = $state('');
 	let createForm = $state({
+		workflow_id: '',
 		topic: 'AI agents in marketing',
 		content_type: 'carousel',
 		template_id: '',
@@ -55,15 +65,22 @@
 	const selectedTemplateOptions = $derived(
 		templatesForType(templates, createForm.content_type)
 	);
+	const selectedWorkflowOptions = $derived(
+		workflowsForType(workflows, createForm.content_type)
+	);
 	const selectedTemplate = $derived(
 		templates.find((template) => template.id === createForm.template_id) ?? null
+	);
+	const selectedWorkflow = $derived(
+		workflows.find((workflow) => workflow.id === createForm.workflow_id) ?? null
 	);
 	const activeSummary = $derived(
 		selectedDetails && selectedDetails.run ? runSummary(selectedDetails.run, selectedDetails) : null
 	);
+	const selectedRunTimeline = $derived(workflowTimeline(selectedDetails));
 
 	onMount(async () => {
-		await Promise.all([loadTemplates(), loadRuns()]);
+		await Promise.all([loadTemplates(), loadWorkflows(), loadRuns()]);
 	});
 
 	async function loadTemplates() {
@@ -81,6 +98,24 @@
 			templateError = err instanceof Error ? err.message : 'Unable to load template catalog';
 		} finally {
 			loadingTemplates = false;
+		}
+	}
+
+	async function loadWorkflows() {
+		loadingWorkflows = true;
+		workflowError = '';
+		try {
+			workflows = await listWorkflows();
+			const compatible = workflowsForType(workflows, createForm.content_type);
+			if (!createForm.workflow_id || !compatible.some((workflow) => workflow.id === createForm.workflow_id)) {
+				applyWorkflow(compatible[0] ?? null);
+			}
+		} catch (err) {
+			workflows = [];
+			createForm.workflow_id = '';
+			workflowError = err instanceof Error ? err.message : 'Unable to load workflow catalog';
+		} finally {
+			loadingWorkflows = false;
 		}
 	}
 
@@ -119,7 +154,8 @@
 		error = '';
 		notice = '';
 		try {
-			const result = await createRun(createForm);
+			const { workflow_id, ...input } = createForm;
+			const result = await createRun(input);
 			notice = 'Run created';
 			runs = await listRuns();
 			await selectRun(result.run.id);
@@ -165,7 +201,27 @@
 
 	function changeContentType(value: string) {
 		createForm.content_type = value;
+		const workflow = workflowsForType(workflows, value)[0] ?? null;
+		if (workflow) {
+			applyWorkflow(workflow);
+			return;
+		}
+		createForm.workflow_id = '';
 		createForm.template_id = templateForType(templates, value);
+	}
+
+	function changeWorkflow(workflowID: string) {
+		applyWorkflow(workflows.find((workflow) => workflow.id === workflowID) ?? null);
+	}
+
+	function applyWorkflow(workflow: WorkflowPreset | null) {
+		createForm.workflow_id = workflow?.id ?? '';
+		if (workflow) {
+			createForm.content_type = workflow.content_type;
+			createForm.template_id = workflow.default_template_id;
+			return;
+		}
+		createForm.template_id = templateForType(templates, createForm.content_type);
 	}
 </script>
 
@@ -317,15 +373,18 @@
 						{/if}
 					</div>
 					<div>
-						<h3>Revision History</h3>
-						{#if selectedDetails.revisions.length === 0}
-							<p class="muted">No revisions yet.</p>
+						<h3>Step Timeline</h3>
+						{#if selectedRunTimeline.length === 0}
+							<p class="muted">No timeline events yet.</p>
 						{:else}
-							<ol class="timeline">
-								{#each selectedDetails.revisions as revision}
-									<li>
-										<strong>{formatShortDate(revision.created_at)}</strong>
-										<span>{revision.instruction}</span>
+							<ol class="step-timeline">
+								{#each selectedRunTimeline as step}
+									<li class={step.status}>
+										<span>{step.label}</span>
+										<strong>{step.detail}</strong>
+										{#if step.at}
+											<small>{formatShortDate(step.at)}</small>
+										{/if}
 									</li>
 								{/each}
 							</ol>
@@ -348,6 +407,34 @@
 					submitCreateRun();
 				}}
 			>
+				<label>
+					Workflow
+					<select value={createForm.workflow_id} onchange={(event) => changeWorkflow(event.currentTarget.value)} disabled={loadingWorkflows || selectedWorkflowOptions.length === 0}>
+						{#if loadingWorkflows}
+							<option value="">Loading workflows...</option>
+						{:else if selectedWorkflowOptions.length === 0}
+							<option value="">No compatible workflows</option>
+						{:else}
+							{#each selectedWorkflowOptions as workflow}
+								<option value={workflow.id}>{workflowLabel(workflow)}</option>
+							{/each}
+						{/if}
+					</select>
+				</label>
+				{#if workflowError}
+					<p class="field-note error-text">{workflowError}</p>
+				{:else if selectedWorkflow}
+					<div class="workflow-card">
+						<strong>{workflowLabel(selectedWorkflow)}</strong>
+						<p>{selectedWorkflow.description}</p>
+						<div class="workflow-steps">
+							{#each selectedWorkflow.steps as step, index}
+								<span>{index + 1}. {workflowStepLabel(step)}</span>
+							{/each}
+						</div>
+						<small>Needs: {selectedWorkflow.required_inputs.join(', ')}</small>
+					</div>
+				{/if}
 				<label>
 					Topic
 					<input bind:value={createForm.topic} required />
@@ -729,7 +816,8 @@
 	}
 
 	.field-note,
-	.template-card {
+	.template-card,
+	.workflow-card {
 		font-family: 'Courier New', monospace;
 		font-size: 0.76rem;
 	}
@@ -738,7 +826,8 @@
 		color: #8b2d1e;
 	}
 
-	.template-card {
+	.template-card,
+	.workflow-card {
 		display: grid;
 		gap: 6px;
 		border: 1px solid #1d241f;
@@ -746,29 +835,75 @@
 		padding: 10px;
 	}
 
+	.workflow-card {
+		border-width: 2px;
+		background: #e8f0c6;
+	}
+
 	.template-card strong,
 	.template-card span,
-	.template-card small {
+	.template-card small,
+	.workflow-card strong,
+	.workflow-card small {
 		display: block;
 	}
 
 	.template-card span,
-	.template-card small {
+	.template-card small,
+	.workflow-card small {
 		color: #657166;
 	}
 
-	.timeline {
+	.workflow-steps {
+		display: grid;
+		gap: 5px;
+	}
+
+	.workflow-steps span {
+		border-left: 3px solid #1d241f;
+		padding-left: 8px;
+	}
+
+	.step-timeline {
+		display: grid;
+		gap: 10px;
 		margin: 12px 0 0;
-		padding-left: 22px;
+		padding: 0;
+		list-style: none;
 	}
 
-	.timeline li {
-		margin-bottom: 12px;
+	.step-timeline li {
+		position: relative;
+		display: grid;
+		gap: 4px;
+		border: 1px solid #1d241f;
+		background: #fffaf0;
+		padding: 10px 10px 10px 42px;
+		font-family: 'Courier New', monospace;
+		font-size: 0.78rem;
 	}
 
-	.timeline strong,
-	.timeline span {
-		display: block;
+	.step-timeline li::before {
+		content: '';
+		position: absolute;
+		left: 12px;
+		top: 12px;
+		width: 14px;
+		aspect-ratio: 1;
+		border: 2px solid #1d241f;
+		background: #fffaf0;
+	}
+
+	.step-timeline li.done::before {
+		background: #d9e078;
+	}
+
+	.step-timeline li.pending {
+		color: #657166;
+	}
+
+	.step-timeline span {
+		text-transform: uppercase;
 	}
 
 	.banner {
