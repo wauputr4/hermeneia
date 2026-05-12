@@ -189,6 +189,17 @@ Notes:
 - Duplicate template IDs across built-in and custom roots fail instead of overriding an existing template.
 - `preview_asset` and `assets` entries must stay inside the template directory; absolute paths and `../` traversal are rejected.
 
+If a custom template is not listed:
+
+- Confirm the template ID matches the path below the configured root, such as
+  `carousel/local-clean` at `carousel/local-clean/template.json`.
+- Check for duplicate IDs with built-ins or earlier custom roots.
+- Use only supported content types: `carousel` or `short_video`.
+- Verify each declared `preview_asset` or `assets` entry exists inside the
+  template directory.
+- Run `HERMENEIA_TEMPLATE_PATH=/path/to/root hermeneia templates` before
+  creating a run so manifest errors are isolated from workflow errors.
+
 ## 2026-05-11 — Template input schema validation
 
 Hermeneia validates the rendered structured input against a manifest's
@@ -215,6 +226,16 @@ Notes:
 - Required preset fields are validated in a fixed order for deterministic errors. `required_inputs` must be non-empty so upcoming CLI/API/UI catalog consumers know which operator inputs are needed before execution.
 - Use `hermeneia workflows`, `GET /v1/workflows`, or `GET /v1/workflows/{workflow_id}` to inspect built-in preset metadata. Preset execution is intentionally separate from this read-only catalog slice.
 - Built-in workflow discovery stops scanning once it finds a preset JSON file, and the workflow service caches lazy-loaded preset catalogs on the service instance. If repeated CLI/API workflow catalog calls look slow, confirm callers keep a stable service instance instead of constructing one per request.
+
+If a workflow preset fails validation:
+
+- Confirm `required_inputs` is present and non-empty.
+- Use only supported step types: `create_brief`, `research_plan`,
+  `revise_brief`, `render`, and `schedule_record`.
+- Ensure `default_template_id` exists in the active template catalog.
+- Match the preset `content_type` to the default template's manifest
+  `content_type`.
+- Rename duplicate preset IDs instead of relying on override order.
 
 ## 2026-05-11 — Web UI workflow selector and timeline
 

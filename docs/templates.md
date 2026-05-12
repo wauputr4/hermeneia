@@ -2,6 +2,9 @@
 
 Templates are reusable media layouts that transform structured content into final assets.
 
+For contributor-facing custom template instructions, see
+[Template Authoring Guide](template-system.md).
+
 ## Template Types
 
 ```text

@@ -99,7 +99,24 @@ Initial CLI slice:
 - SQLite records the research file as a `research_json` artifact.
 - The first brief is generated from the research plan while preserving the normal revise/render workflow.
 
-## Phase 6 — Scheduling and Publishing
+## Phase 6 — Template, Workflow, and Web UI Customization
+
+Goal:
+
+Make Hermeneia useful for local operators and contributors before external
+publishing connectors are added.
+
+Deliverables:
+
+- Contributor-facing template authoring guide.
+- Contributor-facing workflow preset authoring guide.
+- Example custom template and workflow preset files.
+- Web UI improvements for template selection, workflow selection, artifact
+  browsing, and export review.
+- Clear troubleshooting for custom template paths, duplicate IDs, invalid
+  content types, and missing assets.
+
+## Phase 7 — Scheduling and Publishing
 
 Goal:
 
