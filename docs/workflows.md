@@ -3,6 +3,9 @@
 Workflow presets define repeatable content production flows without introducing
 arbitrary scripting or a visual graph builder.
 
+For contributor-facing preset authoring instructions, see
+[Workflow Preset Authoring Guide](workflow-presets.md).
+
 Preset files are JSON documents under `workflows/`. They describe which
 existing Hermeneia service steps should run, not custom code.
 

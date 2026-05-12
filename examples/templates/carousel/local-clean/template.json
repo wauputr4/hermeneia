@@ -1,0 +1,38 @@
+{
+  "id": "carousel/local-clean",
+  "name": "Local Clean Carousel",
+  "content_type": "carousel",
+  "description": "A local 4:5 carousel template for concise explainers.",
+  "version": "1.0.0",
+  "aspect_ratio": "4:5",
+  "renderer": "go-png",
+  "output_kinds": ["content_json", "carousel_png", "caption_text"],
+  "input_schema": {
+    "type": "object",
+    "required": ["template", "slides", "caption", "hashtags"],
+    "properties": {
+      "template": {"const": "carousel/local-clean"},
+      "slides": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 10,
+        "items": {
+          "type": "object",
+          "required": ["type", "headline", "body"],
+          "properties": {
+            "type": {"enum": ["cover", "point", "closing"]},
+            "headline": {"type": "string"},
+            "body": {"type": "string"}
+          }
+        }
+      },
+      "caption": {"type": "string"},
+      "hashtags": {
+        "type": "array",
+        "items": {"type": "string"}
+      }
+    }
+  },
+  "preview_asset": "preview.png",
+  "assets": []
+}

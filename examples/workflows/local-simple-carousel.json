@@ -1,0 +1,16 @@
+{
+  "id": "local-simple-carousel",
+  "name": "Local Simple Carousel",
+  "description": "Create a carousel brief from a topic and render PNG slides.",
+  "content_type": "carousel",
+  "default_template_id": "carousel/local-clean",
+  "steps": [
+    {"type": "create_brief", "name": "Create brief"},
+    {"type": "render", "name": "Render carousel"}
+  ],
+  "required_inputs": ["topic"],
+  "revision_policy": {
+    "mode": "manual",
+    "max_revisions": 3
+  }
+}
