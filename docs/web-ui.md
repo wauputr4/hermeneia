@@ -10,7 +10,9 @@ The MVP slice supports:
 - inspecting a selected run,
 - reviewing brief versions,
 - viewing revision history,
-- previewing generated image/video artifacts grouped by kind,
+- filtering generated artifacts by kind,
+- previewing image/video artifacts while keeping text/json artifacts compact,
+- opening or downloading individual artifacts through the local API file endpoint,
 - creating a run with a workflow-aware and template-aware form,
 - reviewing selected workflow metadata and ordered steps before run creation,
 - viewing a derived step timeline for the selected run,
@@ -57,6 +59,19 @@ Run detail shows a derived timeline from existing run data:
 - revision events,
 - render artifacts,
 - scheduled publishing records.
+
+## Artifact Browser
+
+The artifact section reads artifact metadata from the selected run detail
+payload and uses the existing local-only file endpoint for open/download links:
+
+```text
+GET /v1/runs/{run_id}/artifacts/{artifact_id}/file
+```
+
+Image and video artifacts render inline previews. Text and JSON artifacts keep a
+compact metadata row with filename, path, timestamp, checksum status, and direct
+links.
 
 ## Validation
 
