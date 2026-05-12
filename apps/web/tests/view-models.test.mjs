@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import {
-	artifactGroups,
-	artifactPreviewType,
-	formatShortDate,
-	latestBrief,
-	runSummary,
+	import {
+		artifactDisplayName,
+		artifactGroups,
+		artifactKindLabel,
+		artifactKindOptions,
+		artifactPreviewType,
+		artifactsForKind,
+		formatShortDate,
+		latestBrief,
+		runSummary,
 	templateContentTypeLabel,
 	templateForType,
 	templateLabel,
@@ -49,6 +53,24 @@ describe('web view model helpers', () => {
 		assert.equal(artifactPreviewType({ kind: 'carousel_png', path: 'runs/run-1/output/slide-01.png' }), 'image');
 		assert.equal(artifactPreviewType({ kind: 'video_mp4', path: 'runs/run-1/output/video.mp4' }), 'video');
 		assert.equal(artifactPreviewType({ kind: 'content_json', path: 'runs/run-1/content.json' }), null);
+	});
+
+	it('builds artifact filter options and filtered lists', () => {
+		const artifacts = [
+			{ id: 'artifact-1', kind: 'caption_text', path: 'runs/run-1/output/caption.txt' },
+			{ id: 'artifact-2', kind: 'carousel_png', path: 'runs/run-1/output/slide-01.png' },
+			{ id: 'artifact-3', kind: 'caption_text', path: 'runs/run-1/output/caption-2.txt' }
+		];
+
+		assert.deepEqual(artifactKindOptions(artifacts), ['caption_text', 'carousel_png']);
+		assert.deepEqual(
+			artifactsForKind(artifacts, 'caption_text').map((artifact) => artifact.id),
+			['artifact-1', 'artifact-3']
+		);
+		assert.equal(artifactsForKind(artifacts, 'all').length, 3);
+		assert.equal(artifactKindLabel('content_json'), 'content json');
+		assert.equal(artifactDisplayName(artifacts[1]), 'slide-01.png');
+		assert.equal(artifactDisplayName({ id: 'artifact-4', kind: 'content_json' }), 'artifact-4');
 	});
 
 	it('builds dashboard summary counters from loaded details', () => {

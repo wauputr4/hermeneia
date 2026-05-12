@@ -22,6 +22,25 @@ export function artifactPreviewType(artifact) {
 	return null;
 }
 
+export function artifactKindLabel(kind) {
+	return kind.replaceAll('_', ' ');
+}
+
+export function artifactKindOptions(artifacts) {
+	return [...new Set(artifacts.map((artifact) => artifact.kind))].sort();
+}
+
+export function artifactsForKind(artifacts, kind) {
+	if (!kind || kind === 'all') {
+		return artifacts;
+	}
+	return artifacts.filter((artifact) => artifact.kind === kind);
+}
+
+export function artifactDisplayName(artifact) {
+	return artifact.path?.split(/[\\/]/)?.at(-1) || artifact.id;
+}
+
 export function runSummary(run, details) {
 	const latest = details ? latestBrief(details.briefs) : null;
 	const artifactCount = details ? details.artifacts.length : 0;

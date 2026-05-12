@@ -15,8 +15,12 @@
 		type WorkflowPreset
 	} from '$lib/api';
 	import {
+		artifactDisplayName,
 		artifactGroups,
+		artifactKindLabel,
+		artifactKindOptions,
 		artifactPreviewType,
+		artifactsForKind,
 		formatShortDate,
 		latestBrief,
 		runSummary,
@@ -46,6 +50,7 @@
 	let workflowError = $state('');
 	let notice = $state('');
 	let revisionInstruction = $state('');
+	let artifactKindFilter = $state('all');
 	let createForm = $state({
 		workflow_id: '',
 		topic: 'AI agents in marketing',
@@ -59,9 +64,11 @@
 	$effect(() => {
 		selectedBrief = selectedDetails ? latestBrief(selectedDetails.briefs) : null;
 	});
-	const groupedArtifacts = $derived(
-		selectedDetails ? [...artifactGroups(selectedDetails.artifacts).entries()] : []
+	const artifactKindFilters = $derived(selectedDetails ? artifactKindOptions(selectedDetails.artifacts) : []);
+	const visibleArtifacts = $derived(
+		selectedDetails ? artifactsForKind(selectedDetails.artifacts, artifactKindFilter) : []
 	);
+	const groupedArtifacts = $derived(visibleArtifacts ? [...artifactGroups(visibleArtifacts).entries()] : []);
 	const selectedTemplateOptions = $derived(
 		templatesForType(templates, createForm.content_type)
 	);
@@ -139,6 +146,9 @@
 		error = '';
 		try {
 			selectedDetails = await showRun(runID);
+			if (artifactKindFilter !== 'all' && !artifactKindOptions(selectedDetails.artifacts).includes(artifactKindFilter)) {
+				artifactKindFilter = 'all';
+			}
 		} catch (err) {
 			selectedDetails = null;
 			error = err instanceof Error ? err.message : 'Unable to load run details';
@@ -344,34 +354,49 @@
 					</section>
 				</div>
 
-				<section class="lower-grid">
-					<div>
-						<h3>Artifacts</h3>
-						{#if groupedArtifacts.length === 0}
-							<p class="muted">No artifacts recorded yet.</p>
-						{:else}
-							{#each groupedArtifacts as [kind, artifacts]}
-								<div class="artifact-group">
-									<h4>{kind}</h4>
-									{#each artifacts as artifact}
-										{@const previewType = artifactPreviewType(artifact)}
-										{@const fileURL = artifactFileURL(artifact)}
-										<div class="artifact-card">
-											{#if previewType === 'image'}
-												<img src={fileURL} alt={artifact.path} loading="lazy" />
-											{:else if previewType === 'video'}
-												<video src={fileURL} controls muted playsinline></video>
-											{/if}
-											<p>
-												<a href={fileURL} target="_blank" rel="noreferrer">{artifact.path}</a>
-												<small>{artifact.checksum || 'no checksum'}</small>
-											</p>
-										</div>
+					<section class="lower-grid">
+						<div>
+							<div class="panel-head">
+								<h3>Artifacts</h3>
+								<select class="compact-select" bind:value={artifactKindFilter} aria-label="Filter artifacts by kind">
+									<option value="all">All kinds</option>
+									{#each artifactKindFilters as kind}
+										<option value={kind}>{artifactKindLabel(kind)}</option>
 									{/each}
-								</div>
-							{/each}
-						{/if}
-					</div>
+								</select>
+							</div>
+							{#if selectedDetails.artifacts.length === 0}
+								<p class="muted">No artifacts recorded yet.</p>
+							{:else if groupedArtifacts.length === 0}
+								<p class="muted">No artifacts match this filter.</p>
+							{:else}
+								{#each groupedArtifacts as [kind, artifacts]}
+									<div class="artifact-group">
+										<h4>{artifactKindLabel(kind)} <span>{artifacts.length}</span></h4>
+										{#each artifacts as artifact}
+											{@const previewType = artifactPreviewType(artifact)}
+											{@const fileURL = artifactFileURL(artifact)}
+											<div class:media-artifact={previewType} class="artifact-card">
+												{#if previewType === 'image'}
+													<img src={fileURL} alt={artifact.path} loading="lazy" />
+												{:else if previewType === 'video'}
+													<video src={fileURL} controls muted playsinline></video>
+												{/if}
+												<div class="artifact-meta">
+													<strong>{artifactDisplayName(artifact)}</strong>
+													<span>{artifact.path}</span>
+													<small>{formatShortDate(artifact.created_at)} / {artifact.checksum || 'no checksum'}</small>
+													<div class="artifact-links">
+														<a href={fileURL} target="_blank" rel="noreferrer">Open</a>
+														<a href={fileURL} download={artifactDisplayName(artifact)}>Download</a>
+													</div>
+												</div>
+											</div>
+										{/each}
+									</div>
+								{/each}
+							{/if}
+						</div>
 					<div>
 						<h3>Step Timeline</h3>
 						{#if selectedRunTimeline.length === 0}
@@ -768,52 +793,103 @@
 		font-size: 0.75rem;
 	}
 
-	.artifact-group {
-		margin-top: 14px;
-		border-top: 1px solid #1d241f;
-		padding-top: 10px;
-	}
+		.artifact-group {
+			margin-top: 14px;
+			border-top: 1px solid #1d241f;
+			padding-top: 10px;
+		}
 
-	.artifact-card {
-		display: grid;
-		gap: 8px;
-		margin-top: 10px;
-	}
+		.artifact-group h4 {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 10px;
+			font-family: 'Courier New', monospace;
+			font-size: 0.78rem;
+			text-transform: uppercase;
+		}
 
-	.artifact-card img,
-	.artifact-card video {
-		width: min(100%, 320px);
-		border: 1px solid #1d241f;
-		background: #1d241f;
-		box-shadow: 3px 3px 0 rgba(29, 36, 31, 0.72);
-	}
+		.artifact-group h4 span {
+			border: 1px solid #1d241f;
+			background: #d9e078;
+			padding: 2px 6px;
+		}
+
+		.compact-select {
+			max-width: 170px;
+			padding: 7px 9px;
+			font-family: 'Courier New', monospace;
+			font-size: 0.75rem;
+			text-transform: uppercase;
+		}
+
+		.artifact-card {
+			display: grid;
+			gap: 8px;
+			margin-top: 10px;
+			border: 1px solid #1d241f;
+			background: #fffaf0;
+			padding: 10px;
+		}
+
+		.artifact-card.media-artifact {
+			grid-template-columns: minmax(92px, 160px) minmax(0, 1fr);
+			align-items: start;
+		}
+
+		.artifact-card img,
+		.artifact-card video {
+			width: 100%;
+			border: 1px solid #1d241f;
+			background: #1d241f;
+		}
 
 	.artifact-card img {
 		aspect-ratio: 4 / 5;
 		object-fit: cover;
 	}
 
-	.artifact-card video {
-		aspect-ratio: 9 / 16;
-	}
+		.artifact-card video {
+			aspect-ratio: 9 / 16;
+		}
 
-	.artifact-card p {
-		display: grid;
-		gap: 4px;
-		margin-top: 2px;
-		font-family: 'Courier New', monospace;
-		font-size: 0.75rem;
-		word-break: break-word;
-	}
+		.artifact-meta {
+			display: grid;
+			gap: 6px;
+			font-family: 'Courier New', monospace;
+			font-size: 0.75rem;
+			word-break: break-word;
+		}
 
-	.artifact-card a {
-		color: #1d241f;
-		text-decoration-color: #8b2d1e;
-	}
+		.artifact-meta strong {
+			font-family: Georgia, 'Times New Roman', serif;
+			font-size: 0.98rem;
+			word-break: break-word;
+		}
 
-	.artifact-group small {
-		color: #8b2d1e;
-	}
+		.artifact-meta span,
+		.artifact-meta small {
+			color: #657166;
+		}
+
+		.artifact-links {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 8px;
+		}
+
+		.artifact-links a {
+			border: 1px solid #1d241f;
+			background: #d9e078;
+			padding: 5px 8px;
+			color: #1d241f;
+			text-decoration: none;
+			text-transform: uppercase;
+		}
+
+		.artifact-group small {
+			color: #8b2d1e;
+		}
 
 	.field-note,
 	.template-card,

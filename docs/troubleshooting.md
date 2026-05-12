@@ -234,6 +234,23 @@ step label and timestamp should both use the latest brief version; revision and
 render timestamps should use the latest `created_at`; schedule timestamps should
 use the latest `scheduled_at`.
 
+## 2026-05-12 — Web UI artifact browser
+
+The artifact browser filters run artifacts by metadata kind and links each file
+through `GET /v1/runs/{run_id}/artifacts/{artifact_id}/file`.
+
+Notes:
+
+- Image and video artifacts should preview inline, but text/json artifacts
+  should remain compact metadata rows.
+- If an artifact link fails, verify the artifact still belongs to the selected
+  run and that the stored path stays inside the run directory. The API file
+  handler enforces this local boundary.
+- Browser download behavior can vary for cross-origin development servers; the
+  direct open link uses the same safe endpoint.
+- Artifact rows should tolerate missing stored paths and fall back to the
+  artifact ID for display labels instead of crashing the run detail page.
+
 ## 2026-05-10 — API-driven Web UI template gallery
 
 The Web UI create-run form loads templates from `GET /v1/templates` instead of
