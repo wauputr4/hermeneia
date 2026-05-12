@@ -248,6 +248,8 @@ Notes:
   handler enforces this local boundary.
 - Browser download behavior can vary for cross-origin development servers; the
   direct open link uses the same safe endpoint.
+- Artifact rows should tolerate missing stored paths and fall back to the
+  artifact ID for display labels instead of crashing the run detail page.
 
 ## 2026-05-10 — API-driven Web UI template gallery
 

@@ -70,6 +70,7 @@ describe('web view model helpers', () => {
 		assert.equal(artifactsForKind(artifacts, 'all').length, 3);
 		assert.equal(artifactKindLabel('content_json'), 'content json');
 		assert.equal(artifactDisplayName(artifacts[1]), 'slide-01.png');
+		assert.equal(artifactDisplayName({ id: 'artifact-4', kind: 'content_json' }), 'artifact-4');
 	});
 
 	it('builds dashboard summary counters from loaded details', () => {

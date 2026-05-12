@@ -38,7 +38,7 @@ export function artifactsForKind(artifacts, kind) {
 }
 
 export function artifactDisplayName(artifact) {
-	return artifact.path?.split(/[\\/]/).at(-1) || artifact.id;
+	return artifact.path?.split(/[\\/]/)?.at(-1) || artifact.id;
 }
 
 export function runSummary(run, details) {
