@@ -96,17 +96,28 @@ export function workflowStepLabel(step) {
 	}
 }
 
+function timestampValue(value) {
+	const timestamp = new Date(value ?? '').getTime();
+	return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function compareTimestamp(field) {
+	return (a, b) => timestampValue(a?.[field]) - timestampValue(b?.[field]);
+}
+
 export function workflowTimeline(details) {
 	if (!details) {
 		return [];
 	}
 	const artifacts = details.artifacts ?? [];
-	const revisions = details.revisions ?? [];
-	const schedules = details.scheduled_posts ?? [];
+	const revisions = [...(details.revisions ?? [])].sort(compareTimestamp('created_at'));
+	const schedules = [...(details.scheduled_posts ?? [])].sort(compareTimestamp('scheduled_at'));
 	const hasResearch = artifacts.some((artifact) => artifact.kind === 'research_json');
-	const renderedArtifacts = artifacts.filter((artifact) => artifact.kind !== 'research_json');
-	const latest = latestBrief(details.briefs ?? []);
-	const firstBrief = [...(details.briefs ?? [])].sort((a, b) => a.version - b.version)[0] ?? null;
+	const renderedArtifacts = artifacts
+		.filter((artifact) => artifact.kind !== 'research_json')
+		.sort(compareTimestamp('created_at'));
+	const sortedBriefs = [...(details.briefs ?? [])].sort((a, b) => a.version - b.version);
+	const latest = sortedBriefs.at(-1) ?? null;
 	return [
 		{
 			key: 'research',
@@ -119,7 +130,7 @@ export function workflowTimeline(details) {
 			label: 'Brief',
 			status: latest ? 'done' : 'pending',
 			detail: latest ? `Latest brief v${latest.version}` : 'No brief version yet',
-			at: firstBrief?.created_at
+			at: latest?.created_at
 		},
 		{
 			key: 'revision',

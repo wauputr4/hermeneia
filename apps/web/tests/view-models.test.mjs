@@ -173,4 +173,30 @@ describe('web view model helpers', () => {
 		assert.equal(schedule.status, 'done');
 		assert.equal(schedule.detail, '1 scheduled post');
 	});
+
+	it('uses latest timeline timestamps from unsorted API responses', () => {
+		const timeline = workflowTimeline({
+			briefs: [
+				{ version: 2, created_at: '2026-05-11T00:05:00Z' },
+				{ version: 1, created_at: '2026-05-11T00:00:00Z' }
+			],
+			revisions: [
+				{ id: 'rev-2', created_at: '2026-05-11T00:06:00Z' },
+				{ id: 'rev-1', created_at: '2026-05-11T00:03:00Z' }
+			],
+			artifacts: [
+				{ kind: 'carousel_png', created_at: '2026-05-11T00:02:00Z' },
+				{ kind: 'caption_text', created_at: '2026-05-11T00:07:00Z' }
+			],
+			scheduled_posts: [
+				{ id: 'post-1', scheduled_at: '2026-05-12T00:00:00Z' },
+				{ id: 'post-2', scheduled_at: '2026-05-13T00:00:00Z' }
+			]
+		});
+
+		assert.equal(timeline.find((step) => step.key === 'brief').at, '2026-05-11T00:05:00Z');
+		assert.equal(timeline.find((step) => step.key === 'revision').at, '2026-05-11T00:06:00Z');
+		assert.equal(timeline.find((step) => step.key === 'render').at, '2026-05-11T00:07:00Z');
+		assert.equal(timeline.find((step) => step.key === 'schedule').at, '2026-05-13T00:00:00Z');
+	});
 });

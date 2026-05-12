@@ -228,6 +228,12 @@ step looks wrong, inspect the run's brief versions, `research_json` artifact,
 render artifacts, revision events, and `scheduled_posts` payload before changing
 the UI state model.
 
+Treat those API arrays as external data: sort briefs, revisions, render
+artifacts, and scheduled posts before selecting display timestamps. The brief
+step label and timestamp should both use the latest brief version; revision and
+render timestamps should use the latest `created_at`; schedule timestamps should
+use the latest `scheduled_at`.
+
 ## 2026-05-10 — API-driven Web UI template gallery
 
 The Web UI create-run form loads templates from `GET /v1/templates` instead of
