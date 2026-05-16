@@ -237,6 +237,24 @@ If a workflow preset fails validation:
   `content_type`.
 - Rename duplicate preset IDs instead of relying on override order.
 
+## 2026-05-16 — Workflow preset execution
+
+`hermeneia create --workflow <id>` and `POST /v1/runs` with `workflow_id` can
+create normal runs from workflow presets.
+
+Notes:
+
+- The preset content type and default template are used for run creation.
+- `topic` is required for built-in create flows.
+- Presets with `research_plan` require at least one source URL through
+  `--source` or API `sources`.
+- Presets with `render` call the existing renderer and return standard artifact
+  metadata.
+- Unsupported required input names fail with a validation error instead of being
+  ignored.
+- Presets still cannot run shell commands, plugins, arbitrary scripts, or
+  external publishing connectors.
+
 ## 2026-05-11 — Web UI workflow selector and timeline
 
 The Web UI workflow selector uses the read-only workflow catalog. Selecting a

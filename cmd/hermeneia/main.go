@@ -96,12 +96,18 @@ func (c command) run(ctx context.Context, args []string) error {
 func (c command) create(ctx context.Context, args []string) error {
 	fs := c.flagSet("create")
 	var input workflow.CreateInput
+	var workflowID string
+	var sources sourceFlags
+	var planner string
 	fs.StringVar(&input.Topic, "topic", "", "content topic")
 	fs.StringVar(&input.ContentType, "type", "carousel", "content type: carousel or short_video")
 	fs.StringVar(&input.TemplateID, "template", "", "template id")
 	fs.StringVar(&input.Tone, "tone", "", "brief tone")
 	fs.StringVar(&input.Platform, "platform", "", "target platform")
 	fs.StringVar(&input.TargetAudience, "audience", "", "target audience")
+	fs.StringVar(&workflowID, "workflow", "", "workflow preset id")
+	fs.Var(&sources, "source", "source URL for workflow presets that require research")
+	fs.StringVar(&planner, "planner", "", "research planner for workflow presets")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -109,6 +115,32 @@ func (c command) create(ctx context.Context, args []string) error {
 		input.Topic = strings.Join(fs.Args(), " ")
 	}
 	return c.withService(ctx, func(s workflow.Service) error {
+		if strings.TrimSpace(workflowID) != "" {
+			result, err := s.CreateRunFromWorkflowPreset(ctx, workflow.WorkflowRunInput{
+				WorkflowID:     workflowID,
+				Topic:          input.Topic,
+				Tone:           input.Tone,
+				Platform:       input.Platform,
+				TargetAudience: input.TargetAudience,
+				Sources:        sources.researchSources(),
+				Planner:        planner,
+			})
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(c.stdout, "created workflow run %s\nbrief %s\n", result.Run.ID, result.BriefPath)
+			if result.ResearchPath != "" {
+				fmt.Fprintf(c.stdout, "research %s\n", result.ResearchPath)
+			}
+			if len(result.Artifacts) > 0 {
+				w := tabwriter.NewWriter(c.stdout, 0, 0, 2, ' ', 0)
+				for _, artifact := range result.Artifacts {
+					fmt.Fprintf(w, "-\t%s\t%s\n", artifact.Kind, artifact.Path)
+				}
+				return w.Flush()
+			}
+			return nil
+		}
 		result, err := s.CreateRun(ctx, input)
 		if err != nil {
 			return err
@@ -526,6 +558,25 @@ func parseResearchArgs(args []string) (workflow.ResearchInput, error) {
 	return input, nil
 }
 
+type sourceFlags []string
+
+func (s *sourceFlags) String() string {
+	return strings.Join(*s, ",")
+}
+
+func (s *sourceFlags) Set(value string) error {
+	*s = append(*s, value)
+	return nil
+}
+
+func (s sourceFlags) researchSources() []workflow.ResearchSource {
+	out := make([]workflow.ResearchSource, 0, len(s))
+	for _, value := range s {
+		out = append(out, workflow.ResearchSource{URL: value})
+	}
+	return out
+}
+
 func parseScheduleArgs(args []string) (workflow.ScheduleInput, error) {
 	var input workflow.ScheduleInput
 	positionalRunID := ""
@@ -602,6 +653,7 @@ Configuration:
 
 Examples:
   hermeneia create --topic "AI agents in marketing" --type carousel
+  hermeneia create --workflow simple-carousel --topic "AI agents in marketing"
   hermeneia templates
   hermeneia workflows
   hermeneia research --topic "AI agents" --source "https://example.com/news"

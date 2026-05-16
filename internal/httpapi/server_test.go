@@ -200,6 +200,26 @@ func TestServerResearchRunAndValidation(t *testing.T) {
 	assertStatus(t, missing, http.StatusNotFound)
 }
 
+func TestServerCreateRunFromWorkflowPreset(t *testing.T) {
+	handler := newTestHandler(t)
+
+	create := request(t, handler, http.MethodPost, "/v1/runs", `{"workflow_id":"simple-carousel","topic":"AI agents in marketing"}`)
+	assertStatus(t, create, http.StatusCreated)
+	var created workflowRunResponse
+	decodeResponse(t, create, &created)
+	if created.Run.ID == "" || created.Run.ContentType != "carousel" || created.Run.TemplateID != "carousel/ai-news-clean" {
+		t.Fatalf("unexpected workflow run response: %#v", created)
+	}
+	if len(created.Artifacts) == 0 {
+		t.Fatalf("expected rendered workflow artifacts: %#v", created)
+	}
+
+	missingInput := request(t, handler, http.MethodPost, "/v1/runs", `{"workflow_id":"research-carousel","topic":"AI agents"}`)
+	assertStatus(t, missingInput, http.StatusBadRequest)
+	unknown := request(t, handler, http.MethodPost, "/v1/runs", `{"workflow_id":"missing","topic":"AI agents"}`)
+	assertStatus(t, unknown, http.StatusNotFound)
+}
+
 func TestServerTemplateCatalog(t *testing.T) {
 	handler := newTestHandler(t)
 

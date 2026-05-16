@@ -125,6 +125,15 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
+	if strings.TrimSpace(req.WorkflowID) != "" {
+		result, err := s.service.CreateRunFromWorkflowPreset(r.Context(), req.toWorkflowInput())
+		if err != nil {
+			writeServiceError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, newWorkflowRunResponse(result))
+		return
+	}
 	result, err := s.service.CreateRun(r.Context(), req.toInput())
 	if err != nil {
 		writeServiceError(w, err)
@@ -317,12 +326,15 @@ func (s *Server) handleListScheduledPosts(w http.ResponseWriter, r *http.Request
 }
 
 type createRunRequest struct {
-	Topic          string `json:"topic"`
-	ContentType    string `json:"content_type"`
-	TemplateID     string `json:"template_id"`
-	Tone           string `json:"tone"`
-	Platform       string `json:"platform"`
-	TargetAudience string `json:"target_audience"`
+	WorkflowID     string                    `json:"workflow_id"`
+	Topic          string                    `json:"topic"`
+	ContentType    string                    `json:"content_type"`
+	TemplateID     string                    `json:"template_id"`
+	Tone           string                    `json:"tone"`
+	Platform       string                    `json:"platform"`
+	TargetAudience string                    `json:"target_audience"`
+	Sources        []workflow.ResearchSource `json:"sources"`
+	Planner        string                    `json:"planner"`
 }
 
 func (r createRunRequest) toInput() workflow.CreateInput {
@@ -333,6 +345,18 @@ func (r createRunRequest) toInput() workflow.CreateInput {
 		Tone:           r.Tone,
 		Platform:       r.Platform,
 		TargetAudience: r.TargetAudience,
+	}
+}
+
+func (r createRunRequest) toWorkflowInput() workflow.WorkflowRunInput {
+	return workflow.WorkflowRunInput{
+		WorkflowID:     r.WorkflowID,
+		Topic:          r.Topic,
+		Tone:           r.Tone,
+		Platform:       r.Platform,
+		TargetAudience: r.TargetAudience,
+		Sources:        r.Sources,
+		Planner:        r.Planner,
 	}
 }
 
@@ -386,6 +410,13 @@ type createResearchRunResponse struct {
 	createRunResponse
 	ResearchPath     string           `json:"research_path"`
 	ResearchArtifact artifactResponse `json:"research_artifact"`
+}
+
+type workflowRunResponse struct {
+	createRunResponse
+	ResearchPath     string             `json:"research_path,omitempty"`
+	ResearchArtifact *artifactResponse  `json:"research_artifact,omitempty"`
+	Artifacts        []artifactResponse `json:"artifacts,omitempty"`
 }
 
 type reviseRunResponse struct {
@@ -485,6 +516,26 @@ func newWorkflowPresetResponse(preset workflows.Preset) workflowPresetResponse {
 			Mode:         preset.RevisionPolicy.Mode,
 			MaxRevisions: preset.RevisionPolicy.MaxRevisions,
 		}
+	}
+	return out
+}
+
+func newWorkflowRunResponse(result workflow.WorkflowRunResult) workflowRunResponse {
+	out := workflowRunResponse{
+		createRunResponse: createRunResponse{
+			Run:         newRunResponse(result.Run),
+			Brief:       newBriefResponse(result.Brief),
+			BriefPath:   result.BriefPath,
+			HistoryPath: result.HistoryPath,
+		},
+		ResearchPath: result.ResearchPath,
+	}
+	if result.ResearchArtifact.ID != "" {
+		artifact := newArtifactResponse(result.ResearchArtifact)
+		out.ResearchArtifact = &artifact
+	}
+	for _, artifact := range result.Artifacts {
+		out.Artifacts = append(out.Artifacts, newArtifactResponse(artifact))
 	}
 	return out
 }

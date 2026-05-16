@@ -72,6 +72,16 @@ type CreateInput struct {
 	TargetAudience string
 }
 
+type WorkflowRunInput struct {
+	WorkflowID     string
+	Topic          string
+	Tone           string
+	Platform       string
+	TargetAudience string
+	Sources        []ResearchSource
+	Planner        string
+}
+
 type ResearchInput struct {
 	Topic          string
 	ContentType    string
@@ -110,6 +120,13 @@ type CreateResult struct {
 	Brief       storage.BriefVersion
 	BriefPath   string
 	HistoryPath string
+}
+
+type WorkflowRunResult struct {
+	CreateResult
+	ResearchPath     string
+	ResearchArtifact storage.Artifact
+	Artifacts        []storage.Artifact
 }
 
 type ResearchResult struct {
@@ -199,6 +216,68 @@ func (s Service) CreateRun(ctx context.Context, input CreateInput) (CreateResult
 		return CreateResult{}, err
 	}
 	return s.createRunWithBrief(ctx, input, contentType, template, b, fmt.Sprintf("- v1 created from topic %q.\n", b.Topic))
+}
+
+func (s *Service) CreateRunFromWorkflowPreset(ctx context.Context, input WorkflowRunInput) (WorkflowRunResult, error) {
+	workflowID := strings.TrimSpace(input.WorkflowID)
+	if workflowID == "" {
+		return WorkflowRunResult{}, invalidInput("workflow id is required")
+	}
+	preset, err := s.GetWorkflowPreset(ctx, workflowID)
+	if err != nil {
+		return WorkflowRunResult{}, err
+	}
+	if err := validateWorkflowRequiredInputs(preset, input); err != nil {
+		return WorkflowRunResult{}, err
+	}
+
+	createInput := CreateInput{
+		Topic:          input.Topic,
+		ContentType:    preset.ContentType,
+		TemplateID:     preset.DefaultTemplateID,
+		Tone:           input.Tone,
+		Platform:       input.Platform,
+		TargetAudience: input.TargetAudience,
+	}
+	var out WorkflowRunResult
+	if presetHasStep(preset, workflows.StepResearchPlan) {
+		research, err := s.CreateRunFromResearch(ctx, ResearchInput{
+			Topic:          createInput.Topic,
+			ContentType:    createInput.ContentType,
+			TemplateID:     createInput.TemplateID,
+			Tone:           createInput.Tone,
+			Platform:       createInput.Platform,
+			TargetAudience: createInput.TargetAudience,
+			Sources:        input.Sources,
+			Planner:        input.Planner,
+		})
+		if err != nil {
+			return WorkflowRunResult{}, err
+		}
+		out.CreateResult = research.CreateResult
+		out.ResearchPath = research.ResearchPath
+		out.ResearchArtifact = research.ResearchArtifact
+	} else {
+		created, err := s.CreateRun(ctx, createInput)
+		if err != nil {
+			return WorkflowRunResult{}, err
+		}
+		out.CreateResult = created
+	}
+
+	if presetHasStep(preset, workflows.StepRender) {
+		rendered, err := s.RenderRun(ctx, out.Run.ID)
+		if err != nil {
+			s.cleanupCreatedRun(ctx, out.Run.ID)
+			return WorkflowRunResult{}, err
+		}
+		out.Artifacts = rendered.Artifacts
+	}
+	if err := runfiles.AppendText(out.HistoryPath, fmt.Sprintf("- workflow preset %q executed.\n", preset.ID)); err != nil {
+		s.cleanupCreatedRun(ctx, out.Run.ID)
+		return WorkflowRunResult{}, err
+	}
+	return out, nil
 }
 
 func (s Service) createRunWithBrief(ctx context.Context, input CreateInput, contentType string, template templates.Manifest, b brief.Brief, historyEntry string) (CreateResult, error) {
@@ -996,6 +1075,33 @@ func normalizeContentType(value string) (string, error) {
 	default:
 		return "", invalidInput(fmt.Sprintf("unsupported content type %q", value))
 	}
+}
+
+func validateWorkflowRequiredInputs(preset workflows.Preset, input WorkflowRunInput) error {
+	for _, required := range preset.RequiredInputs {
+		switch required {
+		case "topic":
+			if strings.TrimSpace(input.Topic) == "" {
+				return invalidInput("workflow input topic is required")
+			}
+		case "sources":
+			if len(normalizeResearchSources(input.Sources)) == 0 {
+				return invalidInput("workflow input sources requires at least one source URL")
+			}
+		default:
+			return invalidInput(fmt.Sprintf("workflow preset %q requires unsupported input %q", preset.ID, required))
+		}
+	}
+	return nil
+}
+
+func presetHasStep(preset workflows.Preset, stepType string) bool {
+	for _, step := range preset.Steps {
+		if step.Type == stepType {
+			return true
+		}
+	}
+	return false
 }
 
 func (s Service) resolveTemplate(contentType, templateID string) (templates.Manifest, error) {

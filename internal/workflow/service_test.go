@@ -495,6 +495,73 @@ func TestServiceListsAndGetsWorkflowPresets(t *testing.T) {
 	}
 }
 
+func TestServiceCreateRunFromWorkflowPresetCreatesAndRendersRun(t *testing.T) {
+	ctx := context.Background()
+	db, err := storage.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := storage.Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+
+	service := NewService(storage.NewRepository(db), runfiles.New(t.TempDir()))
+	ids := 0
+	service.NewID = func(prefix, seed string) string {
+		if prefix == "run" {
+			return "run-workflow"
+		}
+		ids++
+		return fmt.Sprintf("%s-workflow-%d", prefix, ids)
+	}
+	result, err := service.CreateRunFromWorkflowPreset(ctx, WorkflowRunInput{
+		WorkflowID: "simple-carousel",
+		Topic:      "AI agents in marketing",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Run.ID != "run-workflow" || result.Run.ContentType != ContentTypeCarousel || result.Run.TemplateID != "carousel/ai-news-clean" {
+		t.Fatalf("unexpected workflow run: %#v", result.Run)
+	}
+	if len(result.Artifacts) == 0 {
+		t.Fatalf("expected rendered artifacts, got %#v", result.Artifacts)
+	}
+	if _, err := os.Stat(service.Files.BriefPath(result.Run.ID, 1)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(service.Files.ContentPath(result.Run.ID)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestServiceCreateRunFromWorkflowPresetValidatesInputs(t *testing.T) {
+	ctx := context.Background()
+	db, err := storage.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := storage.Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+
+	service := NewService(storage.NewRepository(db), runfiles.New(t.TempDir()))
+	_, err = service.CreateRunFromWorkflowPreset(ctx, WorkflowRunInput{WorkflowID: "missing", Topic: "AI agents"})
+	if err == nil || !errors.Is(err, workflows.ErrNotFound) {
+		t.Fatalf("expected missing workflow error, got %v", err)
+	}
+	_, err = service.CreateRunFromWorkflowPreset(ctx, WorkflowRunInput{WorkflowID: "simple-carousel"})
+	if err == nil || !errors.Is(err, ErrInvalidInput) || !strings.Contains(err.Error(), "topic") {
+		t.Fatalf("expected missing topic error, got %v", err)
+	}
+	_, err = service.CreateRunFromWorkflowPreset(ctx, WorkflowRunInput{WorkflowID: "research-carousel", Topic: "AI agents"})
+	if err == nil || !errors.Is(err, ErrInvalidInput) || !strings.Contains(err.Error(), "sources") {
+		t.Fatalf("expected missing sources error, got %v", err)
+	}
+}
+
 func TestServiceCachesLazyWorkflowCatalog(t *testing.T) {
 	ctx := context.Background()
 	db, err := storage.Open(":memory:")
