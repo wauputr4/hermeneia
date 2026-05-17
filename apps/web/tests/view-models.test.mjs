@@ -180,7 +180,8 @@ describe('web view model helpers', () => {
 					platform: 'instagram',
 					status: 'scheduled',
 					artifactID: 'artifact-1',
-					scheduledAt: '2026-05-18T09:00:00Z'
+					scheduledAt: '2026-05-18T09:00:00Z',
+					cancellable: true
 				},
 				{
 					id: 'schedule-2',
@@ -189,8 +190,22 @@ describe('web view model helpers', () => {
 					platform: 'linkedin',
 					status: 'scheduled',
 					artifactID: 'none',
-					scheduledAt: '2026-05-18T10:00:00Z'
+					scheduledAt: '2026-05-18T10:00:00Z',
+					cancellable: true
 				}
+			]
+		);
+	});
+
+	it('only marks scheduled agenda rows as cancellable', () => {
+		assert.deepEqual(
+			scheduleAgendaRows([
+				{ id: 'schedule-1', run_id: 'run-1', status: 'scheduled', scheduled_at: '2026-05-18T09:00:00Z' },
+				{ id: 'schedule-2', run_id: 'run-1', status: 'cancelled', scheduled_at: '2026-05-18T10:00:00Z' }
+			]).map((row) => [row.id, row.cancellable]),
+			[
+				['schedule-1', true],
+				['schedule-2', false]
 			]
 		);
 	});

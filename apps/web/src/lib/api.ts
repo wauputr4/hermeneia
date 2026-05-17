@@ -226,6 +226,13 @@ export function scheduleRun(runID: string, input: SchedulePostInput): Promise<{ 
 	});
 }
 
+export function cancelScheduledPost(scheduleID: string): Promise<{ scheduled_post: ScheduledPost }> {
+	return request(`/v1/scheduled-posts/${encodeURIComponent(scheduleID)}`, {
+		method: 'PATCH',
+		body: JSON.stringify({ status: 'cancelled' })
+	});
+}
+
 export function auditRunArtifacts(runID: string): Promise<ArtifactAuditResult> {
 	return fetchJSON<ArtifactAuditResult>(`/v1/runs/${encodeURIComponent(runID)}/artifact-audit`, undefined, [409]);
 }

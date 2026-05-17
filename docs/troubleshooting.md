@@ -195,7 +195,11 @@ Important guardrails:
   `PATCH /v1/scheduled-posts/{schedule_id}` with `{"status":"cancelled"}` to
   mark a local schedule record cancelled. Other status writes are rejected in
   the MVP. Cancellation is local metadata only and does not contact or undo
-  external platform scheduling.
+  external platform scheduling. The Web UI agenda exposes the same local
+  cancellation action only for rows that are still `scheduled`; cancelled rows
+  should remain visible without a repeated cancel action. Agenda cancellation
+  errors are shown in the agenda panel and should not clear the selected run
+  review state.
 
 ## 2026-05-10 — Template manifest loader
 

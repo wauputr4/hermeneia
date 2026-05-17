@@ -2,6 +2,7 @@
 	import {
 		artifactFileURL,
 		auditRunArtifacts,
+		cancelScheduledPost,
 		createRun,
 		listScheduledPosts,
 		listTemplates,
@@ -64,6 +65,7 @@
 	let workflowError = $state('');
 	let scheduleAgendaError = $state('');
 	let notice = $state('');
+	let cancellingScheduleID = $state('');
 	let revisionInstruction = $state('');
 	let artifactKindFilter = $state('all');
 	let artifactAudit = $state<ArtifactAuditResult | null>(null);
@@ -271,6 +273,25 @@
 		}
 	}
 
+	async function submitCancelSchedule(scheduleID: string) {
+		if (!scheduleID) return;
+		cancellingScheduleID = scheduleID;
+		scheduleAgendaError = '';
+		notice = '';
+		try {
+			await cancelScheduledPost(scheduleID);
+			notice = 'Schedule record cancelled';
+			await loadScheduleAgenda();
+			if (selectedRunID) {
+				await selectRun(selectedRunID);
+			}
+		} catch (err) {
+			scheduleAgendaError = err instanceof Error ? err.message : 'Unable to cancel scheduled post';
+		} finally {
+			cancellingScheduleID = '';
+		}
+	}
+
 	async function submitArtifactAudit() {
 		if (!selectedRunID) return;
 		auditBusy = true;
@@ -394,7 +415,19 @@
 									<strong>{post.topic}</strong>
 									<span>{post.platform} / {post.status}</span>
 								</div>
-								<time datetime={post.scheduledAt}>{formatShortDate(post.scheduledAt)}</time>
+								<div class="agenda-actions">
+									<time datetime={post.scheduledAt}>{formatShortDate(post.scheduledAt)}</time>
+									{#if post.cancellable}
+										<button
+											type="button"
+											class="ghost danger"
+											onclick={() => submitCancelSchedule(post.id)}
+											disabled={busy || cancellingScheduleID === post.id}
+										>
+											{cancellingScheduleID === post.id ? 'Cancelling' : 'Cancel'}
+										</button>
+									{/if}
+								</div>
 								<small>{post.runID} / {post.artifactID}</small>
 							</article>
 						{/each}
@@ -900,6 +933,13 @@
 		gap: 3px;
 	}
 
+	.agenda-actions {
+		align-items: start;
+		display: flex;
+		gap: 8px;
+		justify-content: space-between;
+	}
+
 	.agenda-list strong {
 		font-size: 0.92rem;
 		word-break: break-word;
@@ -917,6 +957,12 @@
 		border: 1px solid #1d241f;
 		background: #d9e078;
 		padding: 4px 6px;
+	}
+
+	.agenda-actions button {
+		font-size: 0.72rem;
+		min-height: 1.9rem;
+		padding: 4px 8px;
 	}
 
 	.agenda-list small {
@@ -1011,6 +1057,11 @@
 
 	button.ghost {
 		background: transparent;
+	}
+
+	button.danger {
+		border-color: #b75b5b;
+		color: #9f2f2f;
 	}
 
 	button:disabled {

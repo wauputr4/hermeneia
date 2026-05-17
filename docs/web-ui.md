@@ -95,6 +95,19 @@ and artifact ID when present. Agenda loading errors stay isolated from the
 selected run review state so operators can keep inspecting run details even if
 the scheduled-post list fails.
 
+Agenda rows with `scheduled` status can be marked `cancelled` from the Web UI.
+The action sends:
+
+```text
+PATCH /v1/scheduled-posts/{schedule_id}
+{"status":"cancelled"}
+```
+
+After a successful cancellation the UI refreshes both the agenda and selected
+run detail. Cancelled rows remain visible with their updated status and do not
+offer a repeated cancel action. This is still local metadata only and does not
+contact or undo external platform scheduling.
+
 ## Artifact Browser
 
 The artifact section reads artifact metadata from the selected run detail
