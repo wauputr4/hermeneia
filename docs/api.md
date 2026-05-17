@@ -233,6 +233,58 @@ Streams the artifact file bytes from the local run folder. This endpoint is
 intended for local Web UI previews and only serves files already registered as
 artifacts for the requested run.
 
+### Artifact Integrity Audit
+
+```http
+GET /v1/runs/{run_id}/artifact-audit
+```
+
+Runs the same read-only artifact integrity check as `hermeneia audit <run-id>`.
+Healthy runs return `200 OK` with `healthy: true` and an empty issue list:
+
+```json
+{
+  "run": {
+    "id": "run-123",
+    "topic": "AI agents in marketing",
+    "content_type": "carousel",
+    "template_id": "carousel/ai-news-clean",
+    "created_at": "2026-05-17T00:00:00Z"
+  },
+  "healthy": true,
+  "issues": []
+}
+```
+
+If artifact drift is detected, the endpoint returns `409 Conflict` while still
+including the structured audit payload:
+
+```json
+{
+  "run": {
+    "id": "run-123",
+    "topic": "AI agents in marketing",
+    "content_type": "carousel",
+    "template_id": "carousel/ai-news-clean",
+    "created_at": "2026-05-17T00:00:00Z"
+  },
+  "healthy": false,
+  "issues": [
+    {
+      "kind": "missing_file",
+      "artifact_id": "artifact-123",
+      "path": "runs/run-123/output/carousel/slide-01.png",
+      "message": "artifact file is missing"
+    }
+  ]
+}
+```
+
+Issue kinds include `missing_file`, `checksum_mismatch`, `unsafe_path`,
+`invalid_file`, `unreadable_file`, `missing_path`, and `untracked_file`.
+The artifact file-serving safeguards are unchanged; this endpoint reports drift
+but does not serve, repair, or delete files.
+
 ### Revise Run
 
 ```http

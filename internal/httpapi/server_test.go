@@ -220,6 +220,61 @@ func TestServerCreateRunFromWorkflowPreset(t *testing.T) {
 	assertStatus(t, unknown, http.StatusNotFound)
 }
 
+func TestServerArtifactAuditPassesForHealthyRender(t *testing.T) {
+	handler := newTestHandler(t)
+
+	create := request(t, handler, http.MethodPost, "/v1/runs", `{"topic":"AI agents in marketing","content_type":"carousel"}`)
+	assertStatus(t, create, http.StatusCreated)
+	var created createRunResponse
+	decodeResponse(t, create, &created)
+
+	rendered := request(t, handler, http.MethodPost, "/v1/runs/"+created.Run.ID+"/render", "")
+	assertStatus(t, rendered, http.StatusCreated)
+
+	audit := request(t, handler, http.MethodGet, "/v1/runs/"+created.Run.ID+"/artifact-audit", "")
+	assertStatus(t, audit, http.StatusOK)
+	var result artifactAuditResponse
+	decodeResponse(t, audit, &result)
+	if !result.Healthy || len(result.Issues) != 0 || result.Run.ID != created.Run.ID {
+		t.Fatalf("unexpected healthy audit response: %#v", result)
+	}
+}
+
+func TestServerArtifactAuditReturnsDriftPayload(t *testing.T) {
+	service := newTestService(t)
+	handler := New(&service)
+
+	create := request(t, handler, http.MethodPost, "/v1/runs", `{"topic":"AI agents in marketing","content_type":"carousel"}`)
+	assertStatus(t, create, http.StatusCreated)
+	var created createRunResponse
+	decodeResponse(t, create, &created)
+
+	rendered := request(t, handler, http.MethodPost, "/v1/runs/"+created.Run.ID+"/render", "")
+	assertStatus(t, rendered, http.StatusCreated)
+	var renderResult renderRunResponse
+	decodeResponse(t, rendered, &renderResult)
+	if len(renderResult.Artifacts) == 0 {
+		t.Fatal("expected rendered artifacts")
+	}
+	if err := os.Remove(renderResult.Artifacts[0].Path); err != nil {
+		t.Fatal(err)
+	}
+
+	audit := request(t, handler, http.MethodGet, "/v1/runs/"+created.Run.ID+"/artifact-audit", "")
+	assertStatus(t, audit, http.StatusConflict)
+	var result artifactAuditResponse
+	decodeResponse(t, audit, &result)
+	if result.Healthy || result.Run.ID != created.Run.ID {
+		t.Fatalf("unexpected drift audit response: %#v", result)
+	}
+	if !artifactAuditResponseContains(result.Issues, "missing_file") {
+		t.Fatalf("expected missing file issue, got %#v", result.Issues)
+	}
+
+	file := request(t, handler, http.MethodGet, "/v1/runs/"+created.Run.ID+"/artifacts/"+renderResult.Artifacts[0].ID+"/file", "")
+	assertStatus(t, file, http.StatusNotFound)
+}
+
 func TestServerTemplateCatalog(t *testing.T) {
 	handler := newTestHandler(t)
 
@@ -448,6 +503,15 @@ func assertStatus(t *testing.T, rec *httptest.ResponseRecorder, want int) {
 	if rec.Code != want {
 		t.Fatalf("expected status %d, got %d: %s", want, rec.Code, rec.Body.String())
 	}
+}
+
+func artifactAuditResponseContains(issues []artifactAuditIssueResponse, kind string) bool {
+	for _, issue := range issues {
+		if issue.Kind == kind {
+			return true
+		}
+	}
+	return false
 }
 
 func decodeResponse(t *testing.T, rec *httptest.ResponseRecorder, dst any) {
