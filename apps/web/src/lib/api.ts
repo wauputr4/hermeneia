@@ -135,6 +135,12 @@ export type CreateRunInput = {
 	planner?: string;
 };
 
+export type SchedulePostInput = {
+	artifact_id?: string;
+	platform: string;
+	scheduled_at: string;
+};
+
 function apiBase(): string {
 	return (env.PUBLIC_HERMENEIA_API_BASE || DEFAULT_API_BASE).replace(/\/$/, '');
 }
@@ -205,6 +211,13 @@ export function reviseRun(runID: string, instruction: string): Promise<{ brief: 
 export function renderRun(runID: string): Promise<{ artifacts: Artifact[] }> {
 	return request(`/v1/runs/${encodeURIComponent(runID)}/render`, {
 		method: 'POST'
+	});
+}
+
+export function scheduleRun(runID: string, input: SchedulePostInput): Promise<{ scheduled_post: ScheduledPost }> {
+	return request(`/v1/runs/${encodeURIComponent(runID)}/schedule`, {
+		method: 'POST',
+		body: JSON.stringify(input)
 	});
 }
 

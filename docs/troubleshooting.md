@@ -182,6 +182,10 @@ Important guardrails:
 - SQLite must not store OAuth tokens, API keys, refresh tokens, or account credentials.
 - Supported MVP platform names are `instagram`, `facebook`, `youtube`, `tiktok`, and `linkedin`.
 - Use future RFC3339 timestamps for `--at` and API `scheduled_at` values. Past timestamps are rejected before schedule rows are created.
+- In the Web UI, create local schedule records from a selected run after at
+  least one render artifact exists. The browser form converts `datetime-local`
+  input to an RFC3339 API timestamp; if the API reports that `scheduled_at`
+  must be in the future, choose a later local time and submit again.
 
 ## 2026-05-10 — Template manifest loader
 
