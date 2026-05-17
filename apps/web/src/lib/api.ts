@@ -190,6 +190,11 @@ export async function listWorkflows(): Promise<WorkflowPreset[]> {
 	return response.workflows;
 }
 
+export async function listScheduledPosts(): Promise<ScheduledPost[]> {
+	const response = await request<{ scheduled_posts: ScheduledPost[] }>('/v1/scheduled-posts');
+	return response.scheduled_posts;
+}
+
 export function showRun(runID: string): Promise<RunDetails> {
 	return request<RunDetails>(`/v1/runs/${encodeURIComponent(runID)}`);
 }

@@ -74,6 +74,22 @@ export function schedulePostPayload(form) {
 	};
 }
 
+export function scheduleAgendaRows(posts, runs = []) {
+	const runsByID = new Map((runs ?? []).map((run) => [run.id, run]));
+	return [...(posts ?? [])].sort(compareTimestamp('scheduled_at')).map((post) => {
+		const run = runsByID.get(post.run_id);
+		return {
+			id: post.id,
+			runID: post.run_id || 'n/a',
+			topic: run?.topic || post.run_id || 'Unknown run',
+			platform: post.platform || 'n/a',
+			status: post.status || 'n/a',
+			artifactID: post.artifact_id || 'none',
+			scheduledAt: post.scheduled_at
+		};
+	});
+}
+
 export function defaultScheduleDateTime(now = new Date()) {
 	const nextHour = new Date(now.getTime() + 60 * 60 * 1000);
 	const local = new Date(nextHour.getTime() - nextHour.getTimezoneOffset() * 60 * 1000);
