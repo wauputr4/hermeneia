@@ -167,7 +167,7 @@ func TestServerRejectsArtifactFileSymlinkEscape(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	file := request(t, New(service), http.MethodGet, "/v1/runs/"+runID+"/artifacts/artifact-symlink/file", "")
+	file := request(t, New(&service), http.MethodGet, "/v1/runs/"+runID+"/artifacts/artifact-symlink/file", "")
 
 	assertStatus(t, file, http.StatusBadRequest)
 }
@@ -198,6 +198,26 @@ func TestServerResearchRunAndValidation(t *testing.T) {
 
 	missing := request(t, handler, http.MethodGet, "/v1/runs/missing", "")
 	assertStatus(t, missing, http.StatusNotFound)
+}
+
+func TestServerCreateRunFromWorkflowPreset(t *testing.T) {
+	handler := newTestHandler(t)
+
+	create := request(t, handler, http.MethodPost, "/v1/runs", `{"workflow_id":"simple-carousel","topic":"AI agents in marketing"}`)
+	assertStatus(t, create, http.StatusCreated)
+	var created workflowRunResponse
+	decodeResponse(t, create, &created)
+	if created.Run.ID == "" || created.Run.ContentType != "carousel" || created.Run.TemplateID != "carousel/ai-news-clean" {
+		t.Fatalf("unexpected workflow run response: %#v", created)
+	}
+	if len(created.Artifacts) == 0 {
+		t.Fatalf("expected rendered workflow artifacts: %#v", created)
+	}
+
+	missingInput := request(t, handler, http.MethodPost, "/v1/runs", `{"workflow_id":"research-carousel","topic":"AI agents"}`)
+	assertStatus(t, missingInput, http.StatusBadRequest)
+	unknown := request(t, handler, http.MethodPost, "/v1/runs", `{"workflow_id":"missing","topic":"AI agents"}`)
+	assertStatus(t, unknown, http.StatusNotFound)
 }
 
 func TestServerTemplateCatalog(t *testing.T) {
@@ -239,7 +259,7 @@ func TestServerTemplateCatalogIncludesCustomRoots(t *testing.T) {
 	}
 	service := newTestService(t)
 	service.Templates = catalog
-	handler := New(service)
+	handler := New(&service)
 
 	list := request(t, handler, http.MethodGet, "/v1/templates", "")
 	assertStatus(t, list, http.StatusOK)
@@ -349,7 +369,8 @@ func TestServerRejectsNonLoopbackCORSOrigin(t *testing.T) {
 
 func newTestHandler(t *testing.T) http.Handler {
 	t.Helper()
-	return New(newTestService(t))
+	service := newTestService(t)
+	return New(&service)
 }
 
 func newTestService(t *testing.T) workflow.Service {

@@ -143,6 +143,7 @@ Request:
 
 ```json
 {
+  "workflow_id": "simple-carousel",
   "topic": "AI agents in marketing",
   "content_type": "carousel",
   "template_id": "carousel/ai-news-clean",
@@ -151,6 +152,13 @@ Request:
   "target_audience": "content operators"
 }
 ```
+
+When `workflow_id` is omitted, `content_type` and `template_id` drive normal
+manual run creation. When `workflow_id` is supplied, Hermeneia resolves the
+preset, validates its required inputs, and creates the run from the preset's
+content type and default template. Presets with a `render` step return generated
+artifact metadata in the response. Presets with `research_plan` require
+`sources`.
 
 Returns `201 Created` with the created run, first brief, and runfile paths.
 

@@ -72,6 +72,16 @@ type CreateInput struct {
 	TargetAudience string
 }
 
+type WorkflowRunInput struct {
+	WorkflowID     string
+	Topic          string
+	Tone           string
+	Platform       string
+	TargetAudience string
+	Sources        []ResearchSource
+	Planner        string
+}
+
 type ResearchInput struct {
 	Topic          string
 	ContentType    string
@@ -110,6 +120,13 @@ type CreateResult struct {
 	Brief       storage.BriefVersion
 	BriefPath   string
 	HistoryPath string
+}
+
+type WorkflowRunResult struct {
+	CreateResult
+	ResearchPath     string
+	ResearchArtifact storage.Artifact
+	Artifacts        []storage.Artifact
 }
 
 type ResearchResult struct {
@@ -180,7 +197,7 @@ func NewService(repo *storage.Repository, files runfiles.Store) Service {
 	return service
 }
 
-func (s Service) CreateRun(ctx context.Context, input CreateInput) (CreateResult, error) {
+func (s *Service) CreateRun(ctx context.Context, input CreateInput) (CreateResult, error) {
 	contentType, err := normalizeContentType(input.ContentType)
 	if err != nil {
 		return CreateResult{}, err
@@ -201,7 +218,72 @@ func (s Service) CreateRun(ctx context.Context, input CreateInput) (CreateResult
 	return s.createRunWithBrief(ctx, input, contentType, template, b, fmt.Sprintf("- v1 created from topic %q.\n", b.Topic))
 }
 
-func (s Service) createRunWithBrief(ctx context.Context, input CreateInput, contentType string, template templates.Manifest, b brief.Brief, historyEntry string) (CreateResult, error) {
+func (s *Service) CreateRunFromWorkflowPreset(ctx context.Context, input WorkflowRunInput) (WorkflowRunResult, error) {
+	workflowID := strings.TrimSpace(input.WorkflowID)
+	if workflowID == "" {
+		return WorkflowRunResult{}, invalidInput("workflow id is required")
+	}
+	preset, err := s.GetWorkflowPreset(ctx, workflowID)
+	if err != nil {
+		return WorkflowRunResult{}, err
+	}
+	if err := validateExecutableWorkflowSteps(preset); err != nil {
+		return WorkflowRunResult{}, err
+	}
+	if err := validateWorkflowRequiredInputs(preset, input); err != nil {
+		return WorkflowRunResult{}, err
+	}
+
+	createInput := CreateInput{
+		Topic:          input.Topic,
+		ContentType:    preset.ContentType,
+		TemplateID:     preset.DefaultTemplateID,
+		Tone:           input.Tone,
+		Platform:       input.Platform,
+		TargetAudience: input.TargetAudience,
+	}
+	var out WorkflowRunResult
+	if presetHasStep(preset, workflows.StepResearchPlan) {
+		research, err := s.CreateRunFromResearch(ctx, ResearchInput{
+			Topic:          createInput.Topic,
+			ContentType:    createInput.ContentType,
+			TemplateID:     createInput.TemplateID,
+			Tone:           createInput.Tone,
+			Platform:       createInput.Platform,
+			TargetAudience: createInput.TargetAudience,
+			Sources:        input.Sources,
+			Planner:        input.Planner,
+		})
+		if err != nil {
+			return WorkflowRunResult{}, err
+		}
+		out.CreateResult = research.CreateResult
+		out.ResearchPath = research.ResearchPath
+		out.ResearchArtifact = research.ResearchArtifact
+	} else {
+		created, err := s.CreateRun(ctx, createInput)
+		if err != nil {
+			return WorkflowRunResult{}, err
+		}
+		out.CreateResult = created
+	}
+
+	if presetHasStep(preset, workflows.StepRender) {
+		rendered, err := s.RenderRun(ctx, out.Run.ID)
+		if err != nil {
+			s.cleanupCreatedRun(ctx, out.Run.ID)
+			return WorkflowRunResult{}, err
+		}
+		out.Artifacts = rendered.Artifacts
+	}
+	if err := runfiles.AppendText(out.HistoryPath, fmt.Sprintf("- workflow preset %q executed.\n", preset.ID)); err != nil {
+		s.cleanupCreatedRun(ctx, out.Run.ID)
+		return WorkflowRunResult{}, err
+	}
+	return out, nil
+}
+
+func (s *Service) createRunWithBrief(ctx context.Context, input CreateInput, contentType string, template templates.Manifest, b brief.Brief, historyEntry string) (CreateResult, error) {
 	runID := s.newID("run", input.Topic)
 	templateID := template.ID
 	if err := s.Files.PrepareRun(runID); err != nil {
@@ -250,11 +332,11 @@ func (s Service) createRunWithBrief(ctx context.Context, input CreateInput, cont
 	return CreateResult{Run: storedRun, Brief: storedVersion, BriefPath: briefPath, HistoryPath: historyPath}, nil
 }
 
-func (s Service) cleanupCreatedRun(ctx context.Context, runID string) {
+func (s *Service) cleanupCreatedRun(ctx context.Context, runID string) {
 	s.cleanupPreparedRun(ctx, runID, true)
 }
 
-func (s Service) cleanupPreparedRun(ctx context.Context, runID string, deleteDB bool) {
+func (s *Service) cleanupPreparedRun(ctx context.Context, runID string, deleteDB bool) {
 	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
 	if deleteDB {
@@ -263,7 +345,7 @@ func (s Service) cleanupPreparedRun(ctx context.Context, runID string, deleteDB 
 	_ = s.Files.RemoveRun(runID)
 }
 
-func (s Service) CreateRunFromResearch(ctx context.Context, input ResearchInput) (ResearchResult, error) {
+func (s *Service) CreateRunFromResearch(ctx context.Context, input ResearchInput) (ResearchResult, error) {
 	contentType, err := normalizeContentType(input.ContentType)
 	if err != nil {
 		return ResearchResult{}, err
@@ -344,11 +426,11 @@ func (s Service) CreateRunFromResearch(ctx context.Context, input ResearchInput)
 	return ResearchResult{CreateResult: created, ResearchPath: researchPath, ResearchArtifact: storedArtifact}, nil
 }
 
-func (s Service) ListRuns(ctx context.Context) ([]storage.ContentRun, error) {
+func (s *Service) ListRuns(ctx context.Context) ([]storage.ContentRun, error) {
 	return s.Repo.ListContentRuns(ctx)
 }
 
-func (s Service) ListTemplates(ctx context.Context) ([]templates.Manifest, error) {
+func (s *Service) ListTemplates(ctx context.Context) ([]templates.Manifest, error) {
 	catalog, err := s.templateCatalog()
 	if err != nil {
 		return nil, err
@@ -356,7 +438,7 @@ func (s Service) ListTemplates(ctx context.Context) ([]templates.Manifest, error
 	return catalog.All(), nil
 }
 
-func (s Service) GetTemplate(ctx context.Context, id string) (templates.Manifest, error) {
+func (s *Service) GetTemplate(ctx context.Context, id string) (templates.Manifest, error) {
 	catalog, err := s.templateCatalog()
 	if err != nil {
 		return templates.Manifest{}, err
@@ -380,7 +462,7 @@ func (s *Service) GetWorkflowPreset(ctx context.Context, id string) (workflows.P
 	return catalog.Get(id)
 }
 
-func (s Service) ShowRun(ctx context.Context, runID string) (RunDetails, error) {
+func (s *Service) ShowRun(ctx context.Context, runID string) (RunDetails, error) {
 	runID = strings.TrimSpace(runID)
 	if runID == "" {
 		return RunDetails{}, invalidInput("run id is required")
@@ -408,7 +490,7 @@ func (s Service) ShowRun(ctx context.Context, runID string) (RunDetails, error) 
 	return RunDetails{Run: run, Briefs: briefs, Revisions: revisions, Artifacts: artifacts, Schedules: schedules}, nil
 }
 
-func (s Service) ListBriefs(ctx context.Context, runID string) ([]storage.BriefVersion, error) {
+func (s *Service) ListBriefs(ctx context.Context, runID string) ([]storage.BriefVersion, error) {
 	runID = strings.TrimSpace(runID)
 	if runID == "" {
 		return nil, invalidInput("run id is required")
@@ -419,7 +501,7 @@ func (s Service) ListBriefs(ctx context.Context, runID string) ([]storage.BriefV
 	return s.Repo.ListBriefVersions(ctx, runID)
 }
 
-func (s Service) ListArtifacts(ctx context.Context, runID string) ([]storage.Artifact, error) {
+func (s *Service) ListArtifacts(ctx context.Context, runID string) ([]storage.Artifact, error) {
 	runID = strings.TrimSpace(runID)
 	if runID == "" {
 		return nil, invalidInput("run id is required")
@@ -430,7 +512,7 @@ func (s Service) ListArtifacts(ctx context.Context, runID string) ([]storage.Art
 	return s.Repo.ListArtifactsByRun(ctx, runID)
 }
 
-func (s Service) GetArtifact(ctx context.Context, runID, artifactID string) (storage.Artifact, error) {
+func (s *Service) GetArtifact(ctx context.Context, runID, artifactID string) (storage.Artifact, error) {
 	runID = strings.TrimSpace(runID)
 	artifactID = strings.TrimSpace(artifactID)
 	if runID == "" {
@@ -442,7 +524,7 @@ func (s Service) GetArtifact(ctx context.Context, runID, artifactID string) (sto
 	return s.Repo.GetArtifactByRun(ctx, runID, artifactID)
 }
 
-func (s Service) DeleteRun(ctx context.Context, runID string) error {
+func (s *Service) DeleteRun(ctx context.Context, runID string) error {
 	runID = strings.TrimSpace(runID)
 	if runID == "" {
 		return invalidInput("run id is required")
@@ -456,7 +538,7 @@ func (s Service) DeleteRun(ctx context.Context, runID string) error {
 	return s.Files.RemoveRun(runID)
 }
 
-func (s Service) ReviseRun(ctx context.Context, runID, instruction string) (ReviseResult, error) {
+func (s *Service) ReviseRun(ctx context.Context, runID, instruction string) (ReviseResult, error) {
 	runID = strings.TrimSpace(runID)
 	instruction = strings.TrimSpace(instruction)
 	if runID == "" {
@@ -516,7 +598,7 @@ func (s Service) ReviseRun(ctx context.Context, runID, instruction string) (Revi
 	return ReviseResult{Run: run, Previous: previous, Brief: storedNext, BriefPath: briefPath}, nil
 }
 
-func (s Service) RenderRun(ctx context.Context, runID string) (RenderResult, error) {
+func (s *Service) RenderRun(ctx context.Context, runID string) (RenderResult, error) {
 	runID = strings.TrimSpace(runID)
 	if runID == "" {
 		return RenderResult{}, invalidInput("run id is required")
@@ -617,7 +699,7 @@ func (s Service) RenderRun(ctx context.Context, runID string) (RenderResult, err
 	return RenderResult{Run: run, Brief: latest, Content: content, Artifacts: artifacts}, nil
 }
 
-func (s Service) SchedulePost(ctx context.Context, input ScheduleInput) (ScheduleResult, error) {
+func (s *Service) SchedulePost(ctx context.Context, input ScheduleInput) (ScheduleResult, error) {
 	runID := strings.TrimSpace(input.RunID)
 	if runID == "" {
 		return ScheduleResult{}, invalidInput("run id is required")
@@ -673,11 +755,11 @@ func (s Service) SchedulePost(ctx context.Context, input ScheduleInput) (Schedul
 	return ScheduleResult{Run: run, Post: stored}, nil
 }
 
-func (s Service) ListScheduledPosts(ctx context.Context) ([]storage.ScheduledPost, error) {
+func (s *Service) ListScheduledPosts(ctx context.Context) ([]storage.ScheduledPost, error) {
 	return s.Repo.ListScheduledPosts(ctx)
 }
 
-func (s Service) researchPlanner(requested string) (ResearchPlanner, error) {
+func (s *Service) researchPlanner(requested string) (ResearchPlanner, error) {
 	switch strings.ToLower(strings.TrimSpace(requested)) {
 	case "", "auto":
 		return DeterministicResearchPlanner{}, nil
@@ -998,7 +1080,60 @@ func normalizeContentType(value string) (string, error) {
 	}
 }
 
-func (s Service) resolveTemplate(contentType, templateID string) (templates.Manifest, error) {
+func validateWorkflowRequiredInputs(preset workflows.Preset, input WorkflowRunInput) error {
+	for _, required := range preset.RequiredInputs {
+		switch required {
+		case "topic":
+			if strings.TrimSpace(input.Topic) == "" {
+				return invalidInput("workflow input topic is required")
+			}
+		case "sources":
+			if len(normalizeResearchSources(input.Sources)) == 0 {
+				return invalidInput("workflow input sources requires at least one source URL")
+			}
+		default:
+			return invalidInput(fmt.Sprintf("workflow preset %q requires unsupported input %q", preset.ID, required))
+		}
+	}
+	return nil
+}
+
+func validateExecutableWorkflowSteps(preset workflows.Preset) error {
+	steps := make([]string, 0, len(preset.Steps))
+	for _, step := range preset.Steps {
+		steps = append(steps, step.Type)
+	}
+	if workflowStepsEqual(steps, workflows.StepCreateBrief) ||
+		workflowStepsEqual(steps, workflows.StepCreateBrief, workflows.StepRender) ||
+		workflowStepsEqual(steps, workflows.StepResearchPlan, workflows.StepCreateBrief) ||
+		workflowStepsEqual(steps, workflows.StepResearchPlan, workflows.StepCreateBrief, workflows.StepRender) {
+		return nil
+	}
+	return invalidInput(fmt.Sprintf("workflow preset %q has unsupported executable step order %q", preset.ID, strings.Join(steps, " -> ")))
+}
+
+func workflowStepsEqual(got []string, want ...string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func presetHasStep(preset workflows.Preset, stepType string) bool {
+	for _, step := range preset.Steps {
+		if step.Type == stepType {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Service) resolveTemplate(contentType, templateID string) (templates.Manifest, error) {
 	catalog, err := s.templateCatalog()
 	if err != nil {
 		return templates.Manifest{}, err
@@ -1092,14 +1227,14 @@ func publishValidationJSON(run storage.ContentRun, platform, artifactID string) 
 	return string(data)
 }
 
-func (s Service) newID(prefix, seed string) string {
+func (s *Service) newID(prefix, seed string) string {
 	if s.NewID != nil {
 		return s.NewID(prefix, seed)
 	}
 	return fmt.Sprintf("%s-%s-%s-%s", prefix, s.now().UTC().Format("20060102-150405"), slug(seed), randomSuffix())
 }
 
-func (s Service) now() time.Time {
+func (s *Service) now() time.Time {
 	if s.Now != nil {
 		return s.Now()
 	}

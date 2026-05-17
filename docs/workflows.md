@@ -87,8 +87,8 @@ The `internal/workflows` validator rejects:
 - missing `default_template_id` references,
 - template references whose `content_type` does not match the preset.
 
-Existing manual CLI and HTTP API operations remain unchanged. Presets are a
-contract layer for upcoming CLI/API catalog exposure and UI workflow selection.
+Existing manual CLI and HTTP API operations remain unchanged. Presets are also
+executable through create-run flows when all required inputs are supplied.
 
 ## Catalog Surfaces
 
@@ -99,6 +99,41 @@ Workflow presets are discoverable through:
 - HTTP API: `GET /v1/workflows/{workflow_id}`
 
 Catalog responses include preset IDs, content types, default template IDs,
-ordered step definitions, and required input names. Run creation does not accept
-`workflow_id` yet; execution remains a later slice so this catalog API can stay
-read-only and stable first.
+ordered step definitions, and required input names.
+
+## Execution
+
+Create a run from a preset through the CLI:
+
+```bash
+hermeneia create --workflow simple-carousel --topic "AI agents in marketing"
+```
+
+For presets that include `research_plan`, provide source URLs:
+
+```bash
+hermeneia create --workflow research-carousel \
+  --topic "AI agents in marketing" \
+  --source "https://example.com/ai-agents"
+```
+
+The HTTP API accepts the same flow through `POST /v1/runs`:
+
+```json
+{
+  "workflow_id": "simple-carousel",
+  "topic": "AI agents in marketing"
+}
+```
+
+Preset execution stays inside existing Hermeneia service steps. `create_brief`
+creates a normal content run with the preset content type and default template,
+`research_plan` uses the same traceable research-run path, and `render` calls
+the existing renderer. Presets do not execute shell commands or arbitrary code.
+
+Create-run execution honors the preset step order for the supported MVP
+sequences: `create_brief`, `create_brief` followed by `render`,
+`research_plan` followed by `create_brief`, and `research_plan` followed by
+`create_brief` followed by `render`. Other valid catalog step types such as
+`revise_brief` and `schedule_record` are rejected during create-run execution
+until dedicated revision and scheduling execution paths are added.

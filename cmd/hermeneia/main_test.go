@@ -99,6 +99,39 @@ func TestCLITemplatesIncludesCustomTemplatePath(t *testing.T) {
 	}
 }
 
+func TestCLICreateWorkflowPresetCreatesRenderedRun(t *testing.T) {
+	ctx := context.Background()
+	var stdout bytes.Buffer
+	dbPath := filepath.Join(t.TempDir(), "hermeneia.db")
+	runsRoot := filepath.Join(t.TempDir(), "runs")
+	t.Setenv("HERMENEIA_DATABASE_PATH", dbPath)
+
+	ids := 0
+	cmd := command{
+		stdout:   &stdout,
+		runsRoot: runsRoot,
+		newID: func(prefix, seed string) string {
+			if prefix == "run" {
+				return "run-workflow-cli"
+			}
+			ids++
+			return prefix + "-workflow-cli-" + string(rune('a'+ids))
+		},
+	}
+	if err := cmd.run(ctx, []string{"create", "--workflow", "simple-carousel", "--topic", "AI agents in marketing"}); err != nil {
+		t.Fatal(err)
+	}
+	output := stdout.String()
+	for _, want := range []string{"created workflow run run-workflow-cli", "brief", "carousel_png"} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("workflow create output missing %q:\n%s", want, output)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(runsRoot, "run-workflow-cli", "output", "carousel", "slide-01.png")); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestUnknownCommandReturnsClearError(t *testing.T) {
 	cmd := command{stdout: &bytes.Buffer{}}
 

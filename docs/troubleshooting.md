@@ -217,6 +217,19 @@ Notes:
 Workflow presets live under `workflows/` as JSON contracts that map named flows
 to existing service steps. They intentionally do not execute arbitrary scripts.
 
+## 2026-05-17 — Workflow preset execution limits
+
+`hermeneia create --workflow <id>` and `POST /v1/runs` with `workflow_id`
+support only ordered create-run sequences: `create_brief`, `create_brief` then
+`render`, `research_plan` then `create_brief`, and `research_plan` then
+`create_brief` then `render`.
+
+If execution fails with an unsupported step order error, inspect the preset's
+`steps` array. `revise_brief`, `schedule_record`, and reordered research steps
+are valid catalog metadata, but they are not executed during create-run flows
+yet. Use the normal revise or schedule commands after creating the run, or split
+the preset into a supported create-run sequence.
+
 Notes:
 
 - Presets must use supported content types: `carousel` or `short_video`.
@@ -236,6 +249,24 @@ If a workflow preset fails validation:
 - Match the preset `content_type` to the default template's manifest
   `content_type`.
 - Rename duplicate preset IDs instead of relying on override order.
+
+## 2026-05-16 — Workflow preset execution
+
+`hermeneia create --workflow <id>` and `POST /v1/runs` with `workflow_id` can
+create normal runs from workflow presets.
+
+Notes:
+
+- The preset content type and default template are used for run creation.
+- `topic` is required for built-in create flows.
+- Presets with `research_plan` require at least one source URL through
+  `--source` or API `sources`.
+- Presets with `render` call the existing renderer and return standard artifact
+  metadata.
+- Unsupported required input names fail with a validation error instead of being
+  ignored.
+- Presets still cannot run shell commands, plugins, arbitrary scripts, or
+  external publishing connectors.
 
 ## 2026-05-11 — Web UI workflow selector and timeline
 

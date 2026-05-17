@@ -495,6 +495,160 @@ func TestServiceListsAndGetsWorkflowPresets(t *testing.T) {
 	}
 }
 
+func TestServiceCreateRunFromWorkflowPresetCreatesAndRendersRun(t *testing.T) {
+	ctx := context.Background()
+	db, err := storage.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := storage.Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+
+	service := NewService(storage.NewRepository(db), runfiles.New(t.TempDir()))
+	ids := 0
+	service.NewID = func(prefix, seed string) string {
+		if prefix == "run" {
+			return "run-workflow"
+		}
+		ids++
+		return fmt.Sprintf("%s-workflow-%d", prefix, ids)
+	}
+	result, err := service.CreateRunFromWorkflowPreset(ctx, WorkflowRunInput{
+		WorkflowID: "simple-carousel",
+		Topic:      "AI agents in marketing",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Run.ID != "run-workflow" || result.Run.ContentType != ContentTypeCarousel || result.Run.TemplateID != "carousel/ai-news-clean" {
+		t.Fatalf("unexpected workflow run: %#v", result.Run)
+	}
+	if len(result.Artifacts) == 0 {
+		t.Fatalf("expected rendered artifacts, got %#v", result.Artifacts)
+	}
+	if _, err := os.Stat(service.Files.BriefPath(result.Run.ID, 1)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(service.Files.ContentPath(result.Run.ID)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestServiceCreateRunFromWorkflowPresetValidatesInputs(t *testing.T) {
+	ctx := context.Background()
+	db, err := storage.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := storage.Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+
+	service := NewService(storage.NewRepository(db), runfiles.New(t.TempDir()))
+	_, err = service.CreateRunFromWorkflowPreset(ctx, WorkflowRunInput{WorkflowID: "missing", Topic: "AI agents"})
+	if err == nil || !errors.Is(err, workflows.ErrNotFound) {
+		t.Fatalf("expected missing workflow error, got %v", err)
+	}
+	_, err = service.CreateRunFromWorkflowPreset(ctx, WorkflowRunInput{WorkflowID: "simple-carousel"})
+	if err == nil || !errors.Is(err, ErrInvalidInput) || !strings.Contains(err.Error(), "topic") {
+		t.Fatalf("expected missing topic error, got %v", err)
+	}
+	_, err = service.CreateRunFromWorkflowPreset(ctx, WorkflowRunInput{WorkflowID: "research-carousel", Topic: "AI agents"})
+	if err == nil || !errors.Is(err, ErrInvalidInput) || !strings.Contains(err.Error(), "sources") {
+		t.Fatalf("expected missing sources error, got %v", err)
+	}
+}
+
+func TestServiceCreateRunFromWorkflowPresetRejectsUnexecutableSteps(t *testing.T) {
+	ctx := context.Background()
+	db, err := storage.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := storage.Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+
+	templateCatalog, err := templates.LoadDir(filepath.Join("..", "..", "templates"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	presetPath := writeWorkflowPresetFile(t, `{
+  "id": "revise-carousel",
+  "name": "Revise Carousel",
+  "description": "Attempts a revision during create-run execution.",
+  "content_type": "carousel",
+  "default_template_id": "carousel/ai-news-clean",
+  "steps": [
+    {"type": "create_brief"},
+    {"type": "revise_brief"}
+  ],
+  "required_inputs": ["topic"]
+}`)
+	workflowCatalog, err := workflows.LoadFiles([]string{presetPath}, templateCatalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	service := NewService(storage.NewRepository(db), runfiles.New(t.TempDir()))
+	service.Templates = templateCatalog
+	service.Workflows = workflowCatalog
+	_, err = service.CreateRunFromWorkflowPreset(ctx, WorkflowRunInput{WorkflowID: "revise-carousel", Topic: "AI agents"})
+	if err == nil || !errors.Is(err, ErrInvalidInput) || !strings.Contains(err.Error(), "revise_brief") {
+		t.Fatalf("expected unsupported executable step error, got %v", err)
+	}
+}
+
+func TestServiceCreateRunFromWorkflowPresetRejectsOutOfOrderResearch(t *testing.T) {
+	ctx := context.Background()
+	db, err := storage.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := storage.Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+
+	templateCatalog, err := templates.LoadDir(filepath.Join("..", "..", "templates"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	presetPath := writeWorkflowPresetFile(t, `{
+  "id": "out-of-order-research",
+  "name": "Out Of Order Research",
+  "description": "Puts research after brief creation.",
+  "content_type": "carousel",
+  "default_template_id": "carousel/ai-news-clean",
+  "steps": [
+    {"type": "create_brief"},
+    {"type": "research_plan"},
+    {"type": "render"}
+  ],
+  "required_inputs": ["topic", "sources"]
+}`)
+	workflowCatalog, err := workflows.LoadFiles([]string{presetPath}, templateCatalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	service := NewService(storage.NewRepository(db), runfiles.New(t.TempDir()))
+	service.Templates = templateCatalog
+	service.Workflows = workflowCatalog
+	_, err = service.CreateRunFromWorkflowPreset(ctx, WorkflowRunInput{
+		WorkflowID: "out-of-order-research",
+		Topic:      "AI agents",
+		Sources:    []ResearchSource{{URL: "https://example.com/agents"}},
+	})
+	if err == nil || !errors.Is(err, ErrInvalidInput) || !strings.Contains(err.Error(), "create_brief -> research_plan -> render") {
+		t.Fatalf("expected unsupported step order error, got %v", err)
+	}
+}
+
 func TestServiceCachesLazyWorkflowCatalog(t *testing.T) {
 	ctx := context.Background()
 	db, err := storage.Open(":memory:")
@@ -653,6 +807,15 @@ func writeWorkflowTestManifest(t *testing.T, root, id, body string) {
 	if err := os.WriteFile(filepath.Join(fullDir, "template.json"), []byte(body+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func writeWorkflowPresetFile(t *testing.T, body string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "preset.json")
+	if err := os.WriteFile(path, []byte(body+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }
 
 func limitedCarouselManifest(id string, maxSlides int) string {

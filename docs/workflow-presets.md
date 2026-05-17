@@ -3,9 +3,9 @@
 Workflow presets describe repeatable Hermeneia flows using existing service
 steps. They are JSON contracts, not arbitrary scripts.
 
-The current preset catalog is read-only. CLI, API, and Web UI surfaces can list
-presets and use their metadata, but run creation does not execute a `workflow_id`
-yet.
+CLI, API, and Web UI surfaces can list presets and use their metadata. CLI and
+HTTP create-run flows can execute a preset by `workflow_id` when all required
+inputs are supplied.
 
 ## Directory Structure
 
@@ -98,6 +98,37 @@ Or through the local API:
 curl http://127.0.0.1:19318/v1/workflows
 curl http://127.0.0.1:19318/v1/workflows/local-simple-carousel
 ```
+
+Execute a built-in preset with:
+
+```bash
+hermeneia create --workflow simple-carousel --topic "AI agents in marketing"
+```
+
+Or via the local API:
+
+```bash
+curl -X POST http://127.0.0.1:19318/v1/runs \
+  -H 'Content-Type: application/json' \
+  -d '{"workflow_id":"simple-carousel","topic":"AI agents in marketing"}'
+```
+
+Execution maps preset steps to existing service methods only. `create_brief`
+creates normal run metadata and `brief.v1.json`, `research_plan` requires
+source URLs and writes `research.json`, and `render` creates the standard
+artifact records and files.
+
+Create-run execution currently supports these ordered step sequences:
+
+- `create_brief`
+- `create_brief` -> `render`
+- `research_plan` -> `create_brief`
+- `research_plan` -> `create_brief` -> `render`
+
+Other valid catalog step types, including `revise_brief` and
+`schedule_record`, remain authoring metadata until dedicated execution flows are
+implemented. Create-run execution fails fast if a preset includes unsupported
+step types or puts supported steps in an unsupported order.
 
 ## Examples
 
