@@ -3,6 +3,7 @@
 		artifactFileURL,
 		auditRunArtifacts,
 		createRun,
+		listScheduledPosts,
 		listTemplates,
 		listRuns,
 		listWorkflows,
@@ -14,6 +15,7 @@
 		type BriefVersion,
 		type ContentRun,
 		type RunDetails,
+		type ScheduledPost,
 		type Template,
 		type WorkflowPreset
 	} from '$lib/api';
@@ -31,6 +33,7 @@
 		formatShortDate,
 		latestBrief,
 		runSummary,
+		scheduleAgendaRows,
 		scheduleArtifactOptions,
 		schedulePostPayload,
 		templateContentTypeLabel,
@@ -45,18 +48,21 @@
 	import { onMount } from 'svelte';
 
 	let runs = $state<ContentRun[]>([]);
+	let scheduledPosts = $state<ScheduledPost[]>([]);
 	let templates = $state<Template[]>([]);
 	let workflows = $state<WorkflowPreset[]>([]);
 	let selectedRunID = $state('');
 	let selectedDetails = $state<RunDetails | null>(null);
 	let selectedBrief = $state<BriefVersion | null>(null);
 	let loading = $state(true);
+	let loadingScheduleAgenda = $state(true);
 	let loadingTemplates = $state(true);
 	let loadingWorkflows = $state(true);
 	let busy = $state(false);
 	let error = $state('');
 	let templateError = $state('');
 	let workflowError = $state('');
+	let scheduleAgendaError = $state('');
 	let notice = $state('');
 	let revisionInstruction = $state('');
 	let artifactKindFilter = $state('all');
@@ -105,6 +111,7 @@
 	const selectedRunTimeline = $derived(workflowTimeline(selectedDetails));
 	const artifactAuditRows = $derived(auditIssueRows(artifactAudit));
 	const scheduleOptions = $derived(selectedDetails ? scheduleArtifactOptions(selectedDetails.artifacts) : []);
+	const agendaRows = $derived(scheduleAgendaRows(scheduledPosts, runs));
 
 	onMount(async () => {
 		await Promise.all([loadTemplates(), loadWorkflows(), loadRuns()]);
@@ -151,6 +158,7 @@
 		error = '';
 		try {
 			runs = await listRuns();
+			await loadScheduleAgenda();
 			if (runs.length > 0) {
 				await selectRun(runs[0].id);
 			}
@@ -158,6 +166,19 @@
 			error = err instanceof Error ? err.message : 'Unable to load runs';
 		} finally {
 			loading = false;
+		}
+	}
+
+	async function loadScheduleAgenda() {
+		loadingScheduleAgenda = true;
+		scheduleAgendaError = '';
+		try {
+			scheduledPosts = await listScheduledPosts();
+		} catch (err) {
+			scheduledPosts = [];
+			scheduleAgendaError = err instanceof Error ? err.message : 'Unable to load scheduled posts';
+		} finally {
+			loadingScheduleAgenda = false;
 		}
 	}
 
@@ -241,6 +262,7 @@
 		try {
 			await scheduleRun(selectedRunID, schedulePostPayload(scheduleForm));
 			notice = 'Schedule record created';
+			await loadScheduleAgenda();
 			await selectRun(selectedRunID);
 		} catch (err) {
 			scheduleError = err instanceof Error ? err.message : 'Unable to schedule run';
@@ -352,6 +374,33 @@
 					{/each}
 				</div>
 			{/if}
+
+			<div class="agenda">
+				<div class="panel-head">
+					<h2>Agenda</h2>
+					<button type="button" class="ghost" onclick={loadScheduleAgenda} disabled={busy || loadingScheduleAgenda}>Refresh</button>
+				</div>
+				{#if scheduleAgendaError}
+					<p class="field-note error-text">{scheduleAgendaError}</p>
+				{:else if loadingScheduleAgenda}
+					<p class="muted">Loading scheduled posts...</p>
+				{:else if agendaRows.length === 0}
+					<p class="muted">No local scheduled posts yet.</p>
+				{:else}
+					<div class="agenda-list">
+						{#each agendaRows as post}
+							<article>
+								<div>
+									<strong>{post.topic}</strong>
+									<span>{post.platform} / {post.status}</span>
+								</div>
+								<time datetime={post.scheduledAt}>{formatShortDate(post.scheduledAt)}</time>
+								<small>{post.runID} / {post.artifactID}</small>
+							</article>
+						{/each}
+					</div>
+				{/if}
+			</div>
 		</aside>
 
 		<section class="detail">
@@ -823,6 +872,56 @@
 		margin-top: 5px;
 		font-family: 'Courier New', monospace;
 		font-size: 0.72rem;
+	}
+
+	.agenda {
+		display: grid;
+		gap: 12px;
+		margin-top: 20px;
+		border-top: 2px solid #1d241f;
+		padding-top: 16px;
+	}
+
+	.agenda-list {
+		display: grid;
+		gap: 10px;
+	}
+
+	.agenda-list article {
+		display: grid;
+		gap: 6px;
+		border: 1px solid #1d241f;
+		background: #fffaf0;
+		padding: 10px;
+	}
+
+	.agenda-list article div {
+		display: grid;
+		gap: 3px;
+	}
+
+	.agenda-list strong {
+		font-size: 0.92rem;
+		word-break: break-word;
+	}
+
+	.agenda-list span,
+	.agenda-list time,
+	.agenda-list small {
+		font-family: 'Courier New', monospace;
+		font-size: 0.72rem;
+	}
+
+	.agenda-list time {
+		width: fit-content;
+		border: 1px solid #1d241f;
+		background: #d9e078;
+		padding: 4px 6px;
+	}
+
+	.agenda-list small {
+		color: #657166;
+		word-break: break-word;
 	}
 
 	.detail {

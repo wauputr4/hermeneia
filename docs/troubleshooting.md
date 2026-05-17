@@ -186,6 +186,11 @@ Important guardrails:
   least one render artifact exists. The browser form converts `datetime-local`
   input to an RFC3339 API timestamp; if the API reports that `scheduled_at`
   must be in the future, choose a later local time and submit again.
+- The Web UI agenda is read-only and loads `GET /v1/scheduled-posts`
+  separately from selected run details. If the agenda shows an error, the run
+  list and selected run review can still be used; check the local API server
+  logs and verify that `hermeneia schedules` can list records from the same
+  SQLite database.
 
 ## 2026-05-10 — Template manifest loader
 

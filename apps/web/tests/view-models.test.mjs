@@ -15,6 +15,7 @@ import {
 	formatShortDate,
 	latestBrief,
 	runSummary,
+	scheduleAgendaRows,
 	scheduleArtifactOptions,
 	schedulePostPayload,
 	templateContentTypeLabel,
@@ -146,6 +147,52 @@ describe('web view model helpers', () => {
 			}
 		);
 		assert.equal(defaultScheduleDateTime(new Date('2026-05-18T08:30:00Z')).length, 16);
+	});
+
+	it('builds sorted scheduled-post agenda rows with run topics', () => {
+		assert.deepEqual(
+			scheduleAgendaRows(
+				[
+					{
+						id: 'schedule-2',
+						run_id: 'run-2',
+						artifact_id: '',
+						platform: 'linkedin',
+						status: 'scheduled',
+						scheduled_at: '2026-05-18T10:00:00Z'
+					},
+					{
+						id: 'schedule-1',
+						run_id: 'run-1',
+						artifact_id: 'artifact-1',
+						platform: 'instagram',
+						status: 'scheduled',
+						scheduled_at: '2026-05-18T09:00:00Z'
+					}
+				],
+				[{ id: 'run-1', topic: 'AI launch' }]
+			),
+			[
+				{
+					id: 'schedule-1',
+					runID: 'run-1',
+					topic: 'AI launch',
+					platform: 'instagram',
+					status: 'scheduled',
+					artifactID: 'artifact-1',
+					scheduledAt: '2026-05-18T09:00:00Z'
+				},
+				{
+					id: 'schedule-2',
+					runID: 'run-2',
+					topic: 'run-2',
+					platform: 'linkedin',
+					status: 'scheduled',
+					artifactID: 'none',
+					scheduledAt: '2026-05-18T10:00:00Z'
+				}
+			]
+		);
 	});
 
 	it('builds dashboard summary counters from loaded details', () => {
