@@ -13,6 +13,7 @@ The MVP slice supports:
 - filtering generated artifacts by kind,
 - previewing image/video artifacts while keeping text/json artifacts compact,
 - opening or downloading individual artifacts through the local API file endpoint,
+- running the read-only artifact integrity audit for the selected run,
 - creating a run with a workflow-aware and template-aware form,
 - reviewing selected workflow metadata and ordered steps before run creation,
 - viewing a derived step timeline for the selected run,
@@ -77,6 +78,17 @@ GET /v1/runs/{run_id}/artifacts/{artifact_id}/file
 Image and video artifacts render inline previews. Text and JSON artifacts keep a
 compact metadata row with filename, path, timestamp, checksum status, and direct
 links.
+
+The run detail view also calls the read-only artifact audit endpoint on demand:
+
+```text
+GET /v1/runs/{run_id}/artifact-audit
+```
+
+Healthy audits show an empty-issue state. Drift responses that return
+`409 Conflict` still render their structured issue payload in the UI, including
+the issue kind, artifact ID when available, path, and message. The Web UI does
+not repair files, delete untracked output, or change SQLite artifact rows.
 
 ## Validation
 

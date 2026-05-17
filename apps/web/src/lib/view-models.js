@@ -41,6 +41,22 @@ export function artifactDisplayName(artifact) {
 	return artifact.path?.split(/[\\/]/)?.at(-1) || artifact.id;
 }
 
+export function auditStatusLabel(audit) {
+	if (!audit) {
+		return 'Not checked';
+	}
+	return audit.healthy ? 'Healthy' : `${audit.issues?.length ?? 0} issue${audit.issues?.length === 1 ? '' : 's'}`;
+}
+
+export function auditIssueRows(audit) {
+	return (audit?.issues ?? []).map((issue) => ({
+		kind: artifactKindLabel(issue.kind || 'unknown'),
+		artifactID: issue.artifact_id || 'n/a',
+		path: issue.path || 'n/a',
+		message: issue.message || 'No message returned'
+	}));
+}
+
 export function runSummary(run, details) {
 	const latest = details ? latestBrief(details.briefs) : null;
 	const artifactCount = details ? details.artifacts.length : 0;

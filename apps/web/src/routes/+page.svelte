@@ -1,6 +1,7 @@
 <script lang="ts">
 	import {
 		artifactFileURL,
+		auditRunArtifacts,
 		createRun,
 		listTemplates,
 		listRuns,
@@ -8,6 +9,7 @@
 		renderRun,
 		reviseRun,
 		showRun,
+		type ArtifactAuditResult,
 		type BriefVersion,
 		type ContentRun,
 		type RunDetails,
@@ -21,6 +23,8 @@
 		artifactKindOptions,
 		artifactPreviewType,
 		artifactsForKind,
+		auditIssueRows,
+		auditStatusLabel,
 		createRunPayload,
 		formatShortDate,
 		latestBrief,
@@ -52,6 +56,9 @@
 	let notice = $state('');
 	let revisionInstruction = $state('');
 	let artifactKindFilter = $state('all');
+	let artifactAudit = $state<ArtifactAuditResult | null>(null);
+	let auditBusy = $state(false);
+	let auditError = $state('');
 	let createForm = $state({
 		workflow_id: '',
 		topic: 'AI agents in marketing',
@@ -86,6 +93,7 @@
 		selectedDetails && selectedDetails.run ? runSummary(selectedDetails.run, selectedDetails) : null
 	);
 	const selectedRunTimeline = $derived(workflowTimeline(selectedDetails));
+	const artifactAuditRows = $derived(auditIssueRows(artifactAudit));
 
 	onMount(async () => {
 		await Promise.all([loadTemplates(), loadWorkflows(), loadRuns()]);
@@ -145,6 +153,8 @@
 	async function selectRun(runID: string) {
 		selectedRunID = runID;
 		error = '';
+		artifactAudit = null;
+		auditError = '';
 		try {
 			selectedDetails = await showRun(runID);
 			if (artifactKindFilter !== 'all' && !artifactKindOptions(selectedDetails.artifacts).includes(artifactKindFilter)) {
@@ -206,6 +216,22 @@
 			error = err instanceof Error ? err.message : 'Unable to render run';
 		} finally {
 			busy = false;
+		}
+	}
+
+	async function submitArtifactAudit() {
+		if (!selectedRunID) return;
+		auditBusy = true;
+		auditError = '';
+		notice = '';
+		try {
+			artifactAudit = await auditRunArtifacts(selectedRunID);
+			notice = artifactAudit.healthy ? 'Artifact audit passed' : 'Artifact audit found drift';
+		} catch (err) {
+			artifactAudit = null;
+			auditError = err instanceof Error ? err.message : 'Unable to audit artifacts';
+		} finally {
+			auditBusy = false;
 		}
 	}
 
@@ -398,6 +424,40 @@
 							{/if}
 						</div>
 					<div>
+						<div class="audit-panel">
+							<div class="panel-head">
+								<div>
+									<h3>Integrity Audit</h3>
+									<p class="muted">Read-only artifact drift check.</p>
+								</div>
+								<button type="button" class="ghost" onclick={submitArtifactAudit} disabled={busy || auditBusy || !selectedRunID}>
+									{auditBusy ? 'Checking' : 'Audit'}
+								</button>
+							</div>
+							{#if auditError}
+								<p class="audit-status error-text">{auditError}</p>
+							{:else}
+								<p class:healthy={artifactAudit?.healthy} class:drift={artifactAudit && !artifactAudit.healthy} class="audit-status">
+									{auditStatusLabel(artifactAudit)}
+								</p>
+							{/if}
+							{#if artifactAudit?.healthy}
+								<p class="muted">No missing files, checksum drift, unsafe paths, or untracked output files were reported.</p>
+							{:else if artifactAuditRows.length > 0}
+								<div class="audit-issues">
+									{#each artifactAuditRows as issue}
+										<div class="audit-issue">
+											<strong>{issue.kind}</strong>
+											<span>{issue.message}</span>
+											<small>Artifact: {issue.artifactID}</small>
+											<small>{issue.path}</small>
+										</div>
+									{/each}
+								</div>
+							{:else if !artifactAudit}
+								<p class="muted">Run an audit after rendering to verify tracked output files.</p>
+							{/if}
+						</div>
 						<h3>Step Timeline</h3>
 						{#if selectedRunTimeline.length === 0}
 							<p class="muted">No timeline events yet.</p>
@@ -891,6 +951,58 @@
 		.artifact-group small {
 			color: #8b2d1e;
 		}
+
+	.audit-panel {
+		display: grid;
+		gap: 10px;
+		margin-bottom: 18px;
+		border-bottom: 2px solid #1d241f;
+		padding-bottom: 16px;
+	}
+
+	.audit-status {
+		width: fit-content;
+		border: 1px solid #1d241f;
+		background: #fffaf0;
+		padding: 6px 9px;
+		font-family: 'Courier New', monospace;
+		font-size: 0.76rem;
+		text-transform: uppercase;
+	}
+
+	.audit-status.healthy {
+		background: #d9e078;
+	}
+
+	.audit-status.drift {
+		background: #ffd7c8;
+	}
+
+	.audit-issues {
+		display: grid;
+		gap: 8px;
+	}
+
+	.audit-issue {
+		display: grid;
+		gap: 4px;
+		border: 1px solid #1d241f;
+		background: #fffaf0;
+		padding: 10px;
+		font-family: 'Courier New', monospace;
+		font-size: 0.75rem;
+		word-break: break-word;
+	}
+
+	.audit-issue strong {
+		font-family: Georgia, 'Times New Roman', serif;
+		font-size: 0.98rem;
+		text-transform: capitalize;
+	}
+
+	.audit-issue small {
+		color: #657166;
+	}
 
 	.field-note,
 	.template-card,

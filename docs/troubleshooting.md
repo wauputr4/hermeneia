@@ -60,6 +60,12 @@ If the audit reports drift:
 - `untracked_file`: remove the stray output file or add a deterministic repair
   path before relying on it operationally.
 
+The local Web UI exposes the same read-only check from the selected run detail
+view. A `409 Conflict` response means drift was found, not that the UI request
+failed; the returned issue rows should still be displayed with kind, artifact
+ID when present, path, and message. Use the CLI audit command for the same
+diagnostic output when working outside the browser.
+
 ## SQLite initialization
 
 If `hermeneia init` cannot open the database, check `HERMENEIA_DATABASE_PATH` first. The default path is `data/hermeneia.db`; parent directories must exist before initialization.
