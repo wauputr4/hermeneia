@@ -782,6 +782,119 @@ func TestServiceRenderRunValidatesTemplateLimitsBeforeWritingArtifacts(t *testin
 	}
 }
 
+func TestServiceAuditRunArtifactsPassesForHealthyRender(t *testing.T) {
+	ctx := context.Background()
+	service := newAuditTestService(t, ctx, "run-audit-healthy")
+	created, err := service.CreateRun(ctx, CreateInput{Topic: "AI agents", ContentType: "carousel"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.RenderRun(ctx, created.Run.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := service.AuditRunArtifacts(ctx, created.Run.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Issues) != 0 {
+		t.Fatalf("expected healthy audit, got %#v", result.Issues)
+	}
+}
+
+func TestServiceAuditRunArtifactsDetectsMissingAndUntrackedFiles(t *testing.T) {
+	ctx := context.Background()
+	service := newAuditTestService(t, ctx, "run-audit-drift")
+	created, err := service.CreateRun(ctx, CreateInput{Topic: "AI agents", ContentType: "carousel"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rendered, err := service.RenderRun(ctx, created.Run.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var removed string
+	for _, artifact := range rendered.Artifacts {
+		if artifact.Kind == "carousel_png" {
+			removed = artifact.Path
+			break
+		}
+	}
+	if removed == "" {
+		t.Fatal("expected a carousel artifact")
+	}
+	if err := os.Remove(removed); err != nil {
+		t.Fatal(err)
+	}
+	orphanPath := filepath.Join(service.Files.CarouselOutputDir(created.Run.ID), "orphan.txt")
+	if err := os.WriteFile(orphanPath, []byte("orphan\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := service.AuditRunArtifacts(ctx, created.Run.ID)
+	if err == nil || !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected audit failure, got %v", err)
+	}
+	if !auditIssuesContain(result.Issues, "missing_file") || !auditIssuesContain(result.Issues, "untracked_file") {
+		t.Fatalf("expected missing and untracked issues, got %#v", result.Issues)
+	}
+}
+
+func TestServiceAuditRunArtifactsDetectsChecksumMismatch(t *testing.T) {
+	ctx := context.Background()
+	service := newAuditTestService(t, ctx, "run-audit-checksum")
+	created, err := service.CreateRun(ctx, CreateInput{Topic: "AI agents", ContentType: "carousel"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rendered, err := service.RenderRun(ctx, created.Run.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(rendered.Artifacts[0].Path, []byte("changed\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := service.AuditRunArtifacts(ctx, created.Run.ID)
+	if err == nil || !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected audit failure, got %v", err)
+	}
+	if !auditIssuesContain(result.Issues, "checksum_mismatch") {
+		t.Fatalf("expected checksum mismatch, got %#v", result.Issues)
+	}
+}
+
+func TestServiceAuditRunArtifactsDetectsUnsafePath(t *testing.T) {
+	ctx := context.Background()
+	service := newAuditTestService(t, ctx, "run-audit-unsafe")
+	created, err := service.CreateRun(ctx, CreateInput{Topic: "AI agents", ContentType: "carousel"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	outside := filepath.Join(t.TempDir(), "outside.txt")
+	if err := os.WriteFile(outside, []byte("outside\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.Repo.CreateArtifact(ctx, storage.Artifact{
+		ID:             "artifact-unsafe",
+		RunID:          created.Run.ID,
+		BriefVersionID: created.Brief.ID,
+		Kind:           "text",
+		Path:           outside,
+		Checksum:       "sha256:ignored",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := service.AuditRunArtifacts(ctx, created.Run.ID)
+	if err == nil || !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected audit failure, got %v", err)
+	}
+	if !auditIssuesContain(result.Issues, "unsafe_path") {
+		t.Fatalf("expected unsafe path, got %#v", result.Issues)
+	}
+}
+
 func TestServiceShowRunRequiresExistingRun(t *testing.T) {
 	ctx := context.Background()
 	db, err := storage.Open(":memory:")
@@ -816,6 +929,37 @@ func writeWorkflowPresetFile(t *testing.T, body string) string {
 		t.Fatal(err)
 	}
 	return path
+}
+
+func newAuditTestService(t *testing.T, ctx context.Context, runID string) Service {
+	t.Helper()
+	db, err := storage.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if err := storage.Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	service := NewService(storage.NewRepository(db), runfiles.New(t.TempDir()))
+	ids := 0
+	service.NewID = func(prefix, seed string) string {
+		if prefix == "run" {
+			return runID
+		}
+		ids++
+		return fmt.Sprintf("%s-audit-%d", prefix, ids)
+	}
+	return service
+}
+
+func auditIssuesContain(issues []ArtifactAuditIssue, kind string) bool {
+	for _, issue := range issues {
+		if issue.Kind == kind {
+			return true
+		}
+	}
+	return false
 }
 
 func limitedCarouselManifest(id string, maxSlides int) string {

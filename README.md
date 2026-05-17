@@ -109,6 +109,7 @@ go run ./cmd/hermeneia templates
 go run ./cmd/hermeneia workflows
 go run ./cmd/hermeneia revise <run-id> --instruction "Make the hook sharper"
 go run ./cmd/hermeneia render <run-id>
+go run ./cmd/hermeneia audit <run-id>
 go run ./cmd/hermeneia schedule <run-id> --platform instagram --at 2026-05-10T02:00:00Z
 go run ./cmd/hermeneia schedules
 go run ./cmd/hermeneia show <run-id>
@@ -159,6 +160,7 @@ Current CLI surface:
 - `hermeneia show` displays run, version, revision, and artifact counts.
 - `hermeneia revise` creates the next brief version and records a revision event. In the MVP it applies a deterministic revision note instead of calling OpenAI.
 - `hermeneia render` writes `content.json`, generates output assets, and stores artifact references.
+- `hermeneia audit` checks a run's artifact rows against files, checksums, safe paths, and untracked output files.
 - `hermeneia schedule` records a future publishing slot with platform validation and no stored platform credentials.
 - `hermeneia schedules` lists scheduled publishing records and their statuses.
 
