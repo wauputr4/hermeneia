@@ -53,6 +53,19 @@ export type Artifact = {
 	created_at: string;
 };
 
+export type ArtifactAuditIssue = {
+	kind: string;
+	artifact_id?: string;
+	path?: string;
+	message: string;
+};
+
+export type ArtifactAuditResult = {
+	run: ContentRun;
+	healthy: boolean;
+	issues: ArtifactAuditIssue[];
+};
+
 export type ScheduledPost = {
 	id: string;
 	run_id: string;
@@ -127,6 +140,10 @@ function apiBase(): string {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+	return fetchJSON<T>(path, init);
+}
+
+async function fetchJSON<T>(path: string, init?: RequestInit, acceptedStatuses: number[] = []): Promise<T> {
 	const headers = new Headers(init?.headers);
 	if (!headers.has('content-type')) {
 		headers.set('content-type', 'application/json');
@@ -136,7 +153,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 		...init,
 		headers
 	});
-	if (!response.ok) {
+	if (!response.ok && !acceptedStatuses.includes(response.status)) {
 		let message = `${response.status} ${response.statusText}`;
 		try {
 			const body = (await response.json()) as { error?: string };
@@ -189,6 +206,10 @@ export function renderRun(runID: string): Promise<{ artifacts: Artifact[] }> {
 	return request(`/v1/runs/${encodeURIComponent(runID)}/render`, {
 		method: 'POST'
 	});
+}
+
+export function auditRunArtifacts(runID: string): Promise<ArtifactAuditResult> {
+	return fetchJSON<ArtifactAuditResult>(`/v1/runs/${encodeURIComponent(runID)}/artifact-audit`, undefined, [409]);
 }
 
 export function artifactFileURL(artifact: Artifact): string {

@@ -1,17 +1,19 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-	import {
-		artifactDisplayName,
-		artifactGroups,
-		artifactKindLabel,
-		artifactKindOptions,
-		artifactPreviewType,
-		artifactsForKind,
-		createRunPayload,
-		formatShortDate,
-		latestBrief,
-		runSummary,
+import {
+	artifactDisplayName,
+	artifactGroups,
+	artifactKindLabel,
+	artifactKindOptions,
+	artifactPreviewType,
+	artifactsForKind,
+	auditIssueRows,
+	auditStatusLabel,
+	createRunPayload,
+	formatShortDate,
+	latestBrief,
+	runSummary,
 	templateContentTypeLabel,
 	templateForType,
 	templateLabel,
@@ -72,6 +74,44 @@ describe('web view model helpers', () => {
 		assert.equal(artifactKindLabel('content_json'), 'content json');
 		assert.equal(artifactDisplayName(artifacts[1]), 'slide-01.png');
 		assert.equal(artifactDisplayName({ id: 'artifact-4', kind: 'content_json' }), 'artifact-4');
+	});
+
+	it('formats artifact audit status and issue rows', () => {
+		assert.equal(auditStatusLabel(null), 'Not checked');
+		assert.equal(auditStatusLabel({ healthy: true, issues: [] }), 'Healthy');
+		assert.equal(auditStatusLabel({ healthy: false, issues: [{ kind: 'missing_file' }, { kind: 'checksum_mismatch' }] }), '2 issues');
+		assert.deepEqual(
+			auditIssueRows({
+				healthy: false,
+				issues: [
+					{
+						kind: 'missing_file',
+						artifact_id: 'artifact-1',
+						path: 'runs/run-1/output/slide.png',
+						message: 'artifact file is missing'
+					},
+					{
+						kind: 'untracked_file',
+						path: 'runs/run-1/output/extra.png',
+						message: ''
+					}
+				]
+			}),
+			[
+				{
+					kind: 'missing file',
+					artifactID: 'artifact-1',
+					path: 'runs/run-1/output/slide.png',
+					message: 'artifact file is missing'
+				},
+				{
+					kind: 'untracked file',
+					artifactID: 'n/a',
+					path: 'runs/run-1/output/extra.png',
+					message: 'No message returned'
+				}
+			]
+		);
 	});
 
 	it('builds dashboard summary counters from loaded details', () => {
