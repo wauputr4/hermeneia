@@ -35,6 +35,26 @@ Important direction:
 - SQLite is the queryable source of truth for run metadata, brief versions, revision events, template selections, and artifact references.
 - The `runs/` directory remains the source of truth for exported asset bytes and inspectable JSON/Markdown snapshots.
 - If a database row and file artifact disagree, prefer preserving the file artifact and repair/rebuild the SQLite metadata from the run folder where possible.
+- Use `hermeneia audit <run-id>` to check a run for missing artifact files,
+  checksum mismatches, unsafe stored paths, and untracked files under
+  `runs/{run-id}/output/`.
+
+## Artifact integrity audit
+
+`hermeneia audit <run-id>` is read-only. It exits successfully when every
+artifact row points to an existing file inside the run directory, stored
+checksums still match, and every file under `output/` is tracked in SQLite.
+
+If the audit reports drift:
+
+- `missing_file`: preserve the database row and rerender the run if the output
+  file cannot be restored.
+- `checksum_mismatch`: inspect the file for manual edits, then rerender or
+  intentionally regenerate metadata in a later repair workflow.
+- `unsafe_path`: treat the row as invalid because the path points outside the
+  run folder.
+- `untracked_file`: remove the stray output file or add a deterministic repair
+  path before relying on it operationally.
 
 ## SQLite initialization
 

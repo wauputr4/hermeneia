@@ -82,6 +82,8 @@ func (c command) run(ctx context.Context, args []string) error {
 		return c.revise(ctx, args[1:])
 	case "render":
 		return c.render(ctx, args[1:])
+	case "audit":
+		return c.audit(ctx, args[1:])
 	case "schedule":
 		return c.schedule(ctx, args[1:])
 	case "schedules":
@@ -299,6 +301,34 @@ func (c command) render(ctx context.Context, args []string) error {
 			fmt.Fprintf(w, "-\t%s\t%s\n", artifact.Kind, artifact.Path)
 		}
 		return w.Flush()
+	})
+}
+
+func (c command) audit(ctx context.Context, args []string) error {
+	runID, err := parseRunArgs(args)
+	if err != nil {
+		return err
+	}
+	return c.withService(ctx, func(s *workflow.Service) error {
+		result, err := s.AuditRunArtifacts(ctx, runID)
+		if err == nil {
+			fmt.Fprintf(c.stdout, "artifact audit passed for %s\n", result.Run.ID)
+			return nil
+		}
+		var auditErr workflow.ArtifactAuditError
+		if !errors.As(err, &auditErr) {
+			return err
+		}
+		fmt.Fprintf(c.stdout, "artifact audit failed for %s\n", result.Run.ID)
+		w := tabwriter.NewWriter(c.stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "KIND\tARTIFACT\tPATH\tMESSAGE")
+		for _, issue := range auditErr.Issues {
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", issue.Kind, issue.ArtifactID, issue.Path, issue.Message)
+		}
+		if flushErr := w.Flush(); flushErr != nil {
+			return flushErr
+		}
+		return err
 	})
 }
 
@@ -640,6 +670,7 @@ Usage:
   hermeneia show              show a content run
   hermeneia revise            create a new brief revision
   hermeneia render            render/export run artifacts
+  hermeneia audit             audit artifact file integrity for a run
   hermeneia schedule          create a scheduled publishing record
   hermeneia schedules         list scheduled publishing records
   hermeneia serve             run the local HTTP API
@@ -659,6 +690,7 @@ Examples:
   hermeneia research --topic "AI agents" --source "https://example.com/news"
   hermeneia revise <run-id> --instruction "Make the hook sharper"
   hermeneia render <run-id>
+  hermeneia audit <run-id>
   hermeneia schedule <run-id> --platform instagram --at 2026-05-10T02:00:00Z
   hermeneia serve --addr 127.0.0.1:19318`)
 }

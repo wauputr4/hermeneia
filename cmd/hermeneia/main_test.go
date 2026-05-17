@@ -31,6 +31,7 @@ func TestHelpOutputIncludesMVPCommandSurface(t *testing.T) {
 		"hermeneia show",
 		"hermeneia revise",
 		"hermeneia render",
+		"hermeneia audit",
 		"hermeneia schedule",
 		"hermeneia schedules",
 		"hermeneia serve",
@@ -129,6 +130,37 @@ func TestCLICreateWorkflowPresetCreatesRenderedRun(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(runsRoot, "run-workflow-cli", "output", "carousel", "slide-01.png")); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestCLIAuditPassesForRenderedWorkflowRun(t *testing.T) {
+	ctx := context.Background()
+	var stdout bytes.Buffer
+	dbPath := filepath.Join(t.TempDir(), "hermeneia.db")
+	runsRoot := filepath.Join(t.TempDir(), "runs")
+	t.Setenv("HERMENEIA_DATABASE_PATH", dbPath)
+
+	ids := 0
+	cmd := command{
+		stdout:   &stdout,
+		runsRoot: runsRoot,
+		newID: func(prefix, seed string) string {
+			if prefix == "run" {
+				return "run-audit-cli"
+			}
+			ids++
+			return prefix + "-audit-cli-" + string(rune('a'+ids))
+		},
+	}
+	if err := cmd.run(ctx, []string{"create", "--workflow", "simple-carousel", "--topic", "AI agents in marketing"}); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	if err := cmd.run(ctx, []string{"audit", "run-audit-cli"}); err != nil {
+		t.Fatal(err)
+	}
+	if output := stdout.String(); !strings.Contains(output, "artifact audit passed for run-audit-cli") {
+		t.Fatalf("audit output missing pass message:\n%s", output)
 	}
 }
 

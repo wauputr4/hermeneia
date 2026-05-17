@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -147,6 +148,30 @@ type RenderResult struct {
 	Brief     storage.BriefVersion
 	Content   any
 	Artifacts []storage.Artifact
+}
+
+type ArtifactAuditResult struct {
+	Run    storage.ContentRun
+	Issues []ArtifactAuditIssue
+}
+
+type ArtifactAuditIssue struct {
+	Kind       string
+	ArtifactID string
+	Path       string
+	Message    string
+}
+
+type ArtifactAuditError struct {
+	Issues []ArtifactAuditIssue
+}
+
+func (e ArtifactAuditError) Error() string {
+	return fmt.Sprintf("artifact integrity audit failed with %d issue(s)", len(e.Issues))
+}
+
+func (e ArtifactAuditError) Unwrap() error {
+	return ErrInvalidInput
 }
 
 type ScheduleInput struct {
@@ -510,6 +535,128 @@ func (s *Service) ListArtifacts(ctx context.Context, runID string) ([]storage.Ar
 		return nil, err
 	}
 	return s.Repo.ListArtifactsByRun(ctx, runID)
+}
+
+func (s *Service) AuditRunArtifacts(ctx context.Context, runID string) (ArtifactAuditResult, error) {
+	runID = strings.TrimSpace(runID)
+	if runID == "" {
+		return ArtifactAuditResult{}, invalidInput("run id is required")
+	}
+	run, err := s.Repo.GetContentRun(ctx, runID)
+	if err != nil {
+		return ArtifactAuditResult{}, err
+	}
+	artifacts, err := s.Repo.ListArtifactsByRun(ctx, runID)
+	if err != nil {
+		return ArtifactAuditResult{}, err
+	}
+
+	runDir, err := filepath.Abs(s.Files.RunDir(runID))
+	if err != nil {
+		return ArtifactAuditResult{}, err
+	}
+	var issues []ArtifactAuditIssue
+	tracked := make(map[string]bool, len(artifacts))
+	for _, artifact := range artifacts {
+		cleanPath := filepath.Clean(artifact.Path)
+		issue := ArtifactAuditIssue{ArtifactID: artifact.ID, Path: cleanPath}
+		if strings.TrimSpace(artifact.Path) == "" {
+			issue.Kind = "missing_path"
+			issue.Message = "artifact row has an empty file path"
+			issues = append(issues, issue)
+			continue
+		}
+		absPath, err := filepath.Abs(cleanPath)
+		if err != nil {
+			issue.Kind = "unsafe_path"
+			issue.Message = err.Error()
+			issues = append(issues, issue)
+			continue
+		}
+		tracked[filepath.Clean(absPath)] = true
+		if !pathWithinDirectory(runDir, absPath) {
+			issue.Kind = "unsafe_path"
+			issue.Message = "artifact path is outside the run directory"
+			issues = append(issues, issue)
+			continue
+		}
+		info, err := os.Stat(absPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				issue.Kind = "missing_file"
+				issue.Message = "artifact file is missing"
+			} else {
+				issue.Kind = "unreadable_file"
+				issue.Message = err.Error()
+			}
+			issues = append(issues, issue)
+			continue
+		}
+		if info.IsDir() {
+			issue.Kind = "invalid_file"
+			issue.Message = "artifact path points to a directory"
+			issues = append(issues, issue)
+			continue
+		}
+		resolvedPath, err := filepath.EvalSymlinks(absPath)
+		if err != nil {
+			issue.Kind = "unreadable_file"
+			issue.Message = err.Error()
+			issues = append(issues, issue)
+			continue
+		}
+		if !pathWithinDirectory(runDir, resolvedPath) {
+			issue.Kind = "unsafe_path"
+			issue.Message = "artifact path resolves outside the run directory"
+			issues = append(issues, issue)
+			continue
+		}
+		if artifact.Checksum != "" {
+			checksum, err := runfiles.Checksum(resolvedPath)
+			if err != nil {
+				issue.Kind = "unreadable_file"
+				issue.Message = err.Error()
+				issues = append(issues, issue)
+				continue
+			}
+			if checksum != artifact.Checksum {
+				issue.Kind = "checksum_mismatch"
+				issue.Message = fmt.Sprintf("expected %s, got %s", artifact.Checksum, checksum)
+				issues = append(issues, issue)
+			}
+		}
+	}
+
+	outputDir := filepath.Join(runDir, "output")
+	if info, err := os.Stat(outputDir); err == nil && info.IsDir() {
+		walkErr := filepath.WalkDir(outputDir, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				issues = append(issues, ArtifactAuditIssue{Kind: "unreadable_file", Path: filepath.Clean(path), Message: err.Error()})
+				return nil
+			}
+			if d.IsDir() {
+				return nil
+			}
+			cleanPath := filepath.Clean(path)
+			if !tracked[cleanPath] {
+				issues = append(issues, ArtifactAuditIssue{
+					Kind:    "untracked_file",
+					Path:    cleanPath,
+					Message: "file under run output is not tracked in SQLite artifacts",
+				})
+			}
+			return nil
+		})
+		if walkErr != nil {
+			return ArtifactAuditResult{}, walkErr
+		}
+	}
+
+	result := ArtifactAuditResult{Run: run, Issues: issues}
+	if len(issues) > 0 {
+		return result, ArtifactAuditError{Issues: issues}
+	}
+	return result, nil
 }
 
 func (s *Service) GetArtifact(ctx context.Context, runID, artifactID string) (storage.Artifact, error) {
@@ -1122,6 +1269,11 @@ func workflowStepsEqual(got []string, want ...string) bool {
 		}
 	}
 	return true
+}
+
+func pathWithinDirectory(root, path string) bool {
+	relative, err := filepath.Rel(root, path)
+	return err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) && !filepath.IsAbs(relative)
 }
 
 func presetHasStep(preset workflows.Preset, stepType string) bool {

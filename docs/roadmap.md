@@ -115,6 +115,8 @@ Deliverables:
   browsing, and export review.
 - Clear troubleshooting for custom template paths, duplicate IDs, invalid
   content types, and missing assets.
+- Read-only artifact integrity audit for missing files, checksum drift, unsafe
+  paths, and untracked output files.
 
 ## Phase 7 — Scheduling and Publishing
 
