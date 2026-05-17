@@ -77,6 +77,12 @@ export type Template = {
 	assets?: string[];
 };
 
+export type ResearchSource = {
+	url: string;
+	note?: string;
+	title?: string;
+};
+
 export type WorkflowStep = {
 	type: string;
 	name?: string;
@@ -106,11 +112,14 @@ export type RunDetails = {
 
 export type CreateRunInput = {
 	topic: string;
-	content_type: string;
-	template_id: string;
-	tone: string;
-	platform: string;
-	target_audience: string;
+	content_type?: string;
+	template_id?: string;
+	tone?: string;
+	platform?: string;
+	target_audience?: string;
+	workflow_id?: string;
+	sources?: ResearchSource[];
+	planner?: string;
 };
 
 function apiBase(): string {
@@ -162,7 +171,7 @@ export function showRun(runID: string): Promise<RunDetails> {
 	return request<RunDetails>(`/v1/runs/${encodeURIComponent(runID)}`);
 }
 
-export function createRun(input: CreateRunInput): Promise<{ run: ContentRun; brief: BriefVersion }> {
+export function createRun(input: CreateRunInput): Promise<{ run: ContentRun; brief: BriefVersion; artifacts?: Artifact[] }> {
 	return request('/v1/runs', {
 		method: 'POST',
 		body: JSON.stringify(input)
