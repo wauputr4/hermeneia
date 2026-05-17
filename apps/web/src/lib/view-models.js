@@ -115,6 +115,26 @@ export function workflowStepLabel(step) {
 	}
 }
 
+export function createRunPayload(form) {
+	const base = {
+		topic: form.topic,
+		tone: form.tone,
+		platform: form.platform,
+		target_audience: form.target_audience
+	};
+	if (form.workflow_id) {
+		return {
+			...base,
+			workflow_id: form.workflow_id
+		};
+	}
+	return {
+		...base,
+		content_type: form.content_type,
+		template_id: form.template_id
+	};
+}
+
 function timestampValue(value) {
 	const timestamp = new Date(value ?? '').getTime();
 	return Number.isNaN(timestamp) ? 0 : timestamp;

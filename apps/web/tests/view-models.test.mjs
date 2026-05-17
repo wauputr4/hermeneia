@@ -8,6 +8,7 @@ import { describe, it } from 'node:test';
 		artifactKindOptions,
 		artifactPreviewType,
 		artifactsForKind,
+		createRunPayload,
 		formatShortDate,
 		latestBrief,
 		runSummary,
@@ -138,6 +139,49 @@ describe('web view model helpers', () => {
 		assert.equal(workflowForType(workflows, 'short_video'), 'video-flow');
 		assert.equal(workflowLabel({ id: 'fallback-carousel', name: '' }), 'fallback-carousel');
 		assert.equal(workflowStepLabel({ type: 'research_plan' }), 'Research plan');
+	});
+
+	it('builds a workflow-backed create-run payload', () => {
+		assert.deepEqual(
+			createRunPayload({
+				workflow_id: 'simple-carousel',
+				topic: 'AI agents in marketing',
+				content_type: 'carousel',
+				template_id: 'carousel/ai-news-clean',
+				tone: 'clear and practical',
+				platform: 'instagram',
+				target_audience: 'content operators'
+			}),
+			{
+				workflow_id: 'simple-carousel',
+				topic: 'AI agents in marketing',
+				tone: 'clear and practical',
+				platform: 'instagram',
+				target_audience: 'content operators'
+			}
+		);
+	});
+
+	it('builds a manual create-run payload without workflow metadata', () => {
+		assert.deepEqual(
+			createRunPayload({
+				workflow_id: '',
+				topic: 'AI agents in marketing',
+				content_type: 'carousel',
+				template_id: 'carousel/ai-news-clean',
+				tone: 'clear and practical',
+				platform: 'instagram',
+				target_audience: 'content operators'
+			}),
+			{
+				topic: 'AI agents in marketing',
+				content_type: 'carousel',
+				template_id: 'carousel/ai-news-clean',
+				tone: 'clear and practical',
+				platform: 'instagram',
+				target_audience: 'content operators'
+			}
+		);
 	});
 
 	it('derives an empty run workflow timeline', () => {

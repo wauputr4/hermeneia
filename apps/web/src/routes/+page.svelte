@@ -21,6 +21,7 @@
 		artifactKindOptions,
 		artifactPreviewType,
 		artifactsForKind,
+		createRunPayload,
 		formatShortDate,
 		latestBrief,
 		runSummary,
@@ -164,8 +165,7 @@
 		error = '';
 		notice = '';
 		try {
-			const { workflow_id, ...input } = createForm;
-			const result = await createRun(input);
+			const result = await createRun(createRunPayload(createForm));
 			notice = 'Run created';
 			runs = await listRuns();
 			await selectRun(result.run.id);
@@ -440,6 +440,7 @@
 						{:else if selectedWorkflowOptions.length === 0}
 							<option value="">No compatible workflows</option>
 						{:else}
+							<option value="">Manual run</option>
 							{#each selectedWorkflowOptions as workflow}
 								<option value={workflow.id}>{workflowLabel(workflow)}</option>
 							{/each}
