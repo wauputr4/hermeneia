@@ -116,6 +116,16 @@ func TestMigrateAndRepositoryCreateRead(t *testing.T) {
 	if len(posts) != 1 || posts[0].ID != "schedule-1" || posts[0].CreatedAt.IsZero() || posts[0].UpdatedAt.IsZero() {
 		t.Fatalf("unexpected scheduled posts: %#v", posts)
 	}
+	if err := repo.UpdateScheduledPostStatus(ctx, "schedule-1", "cancelled"); err != nil {
+		t.Fatal(err)
+	}
+	cancelled, err := repo.GetScheduledPost(ctx, "schedule-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cancelled.Status != "cancelled" || cancelled.UpdatedAt.IsZero() {
+		t.Fatalf("expected cancelled scheduled post, got %#v", cancelled)
+	}
 	if _, err := repo.GetContentRun(ctx, "missing"); err != sql.ErrNoRows {
 		t.Fatalf("expected sql.ErrNoRows, got %v", err)
 	}

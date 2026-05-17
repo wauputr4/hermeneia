@@ -186,6 +186,11 @@ type ScheduleResult struct {
 	Post storage.ScheduledPost
 }
 
+type ScheduleStatusInput struct {
+	ScheduleID string
+	Status     string
+}
+
 type RunDetails struct {
 	Run       storage.ContentRun
 	Briefs    []storage.BriefVersion
@@ -904,6 +909,44 @@ func (s *Service) SchedulePost(ctx context.Context, input ScheduleInput) (Schedu
 
 func (s *Service) ListScheduledPosts(ctx context.Context) ([]storage.ScheduledPost, error) {
 	return s.Repo.ListScheduledPosts(ctx)
+}
+
+func (s *Service) UpdateScheduledPostStatus(ctx context.Context, input ScheduleStatusInput) (ScheduleResult, error) {
+	scheduleID := strings.TrimSpace(input.ScheduleID)
+	if scheduleID == "" {
+		return ScheduleResult{}, invalidInput("schedule id is required")
+	}
+	status := strings.ToLower(strings.TrimSpace(input.Status))
+	if status == "" {
+		return ScheduleResult{}, invalidInput("status is required")
+	}
+	if status != "cancelled" {
+		return ScheduleResult{}, invalidInput(fmt.Sprintf("unsupported scheduled post status %q", input.Status))
+	}
+	post, err := s.Repo.GetScheduledPost(ctx, scheduleID)
+	if err != nil {
+		return ScheduleResult{}, err
+	}
+	if post.Status != "scheduled" && post.Status != "cancelled" {
+		return ScheduleResult{}, invalidInput(fmt.Sprintf("cannot cancel scheduled post with status %q", post.Status))
+	}
+	run, err := s.Repo.GetContentRun(ctx, post.RunID)
+	if err != nil {
+		return ScheduleResult{}, err
+	}
+	if post.Status != status {
+		if err := s.Repo.UpdateScheduledPostStatus(ctx, scheduleID, status); err != nil {
+			return ScheduleResult{}, err
+		}
+		if err := runfiles.AppendText(s.Files.HistoryPath(post.RunID), fmt.Sprintf("- cancelled scheduled %s post %s.\n", post.Platform, post.ID)); err != nil {
+			return ScheduleResult{}, err
+		}
+		post, err = s.Repo.GetScheduledPost(ctx, scheduleID)
+		if err != nil {
+			return ScheduleResult{}, err
+		}
+	}
+	return ScheduleResult{Run: run, Post: post}, nil
 }
 
 func (s *Service) researchPlanner(requested string) (ResearchPlanner, error) {

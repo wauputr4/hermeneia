@@ -337,3 +337,22 @@ GET /v1/scheduled-posts
 ```
 
 Returns scheduled publishing records ordered by `scheduled_at`.
+
+### Update Scheduled Post Status
+
+```http
+PATCH /v1/scheduled-posts/{schedule_id}
+```
+
+Request:
+
+```json
+{
+  "status": "cancelled"
+}
+```
+
+Returns `200 OK` with the updated scheduled publishing record. The MVP only
+supports the local metadata transition to `cancelled`; unsupported status values
+return `400 Bad Request`. This does not contact any social platform or revoke an
+external scheduled post.

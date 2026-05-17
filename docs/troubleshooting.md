@@ -191,6 +191,11 @@ Important guardrails:
   list and selected run review can still be used; check the local API server
   logs and verify that `hermeneia schedules` can list records from the same
   SQLite database.
+- Use `hermeneia cancel-schedule <schedule-id>` or
+  `PATCH /v1/scheduled-posts/{schedule_id}` with `{"status":"cancelled"}` to
+  mark a local schedule record cancelled. Other status writes are rejected in
+  the MVP. Cancellation is local metadata only and does not contact or undo
+  external platform scheduling.
 
 ## 2026-05-10 — Template manifest loader
 

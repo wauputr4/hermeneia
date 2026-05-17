@@ -98,6 +98,20 @@ func TestServiceCreateReviseAndRenderCarouselRun(t *testing.T) {
 	if !strings.Contains(scheduled.Post.ValidationJSON, `"credentials_stored_in_db":false`) {
 		t.Fatalf("validation must not store credentials: %s", scheduled.Post.ValidationJSON)
 	}
+	cancelled, err := service.UpdateScheduledPostStatus(ctx, ScheduleStatusInput{ScheduleID: scheduled.Post.ID, Status: "cancelled"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cancelled.Post.Status != "cancelled" || cancelled.Run.ID != created.Run.ID {
+		t.Fatalf("unexpected cancelled post: %#v", cancelled)
+	}
+	_, err = service.UpdateScheduledPostStatus(ctx, ScheduleStatusInput{ScheduleID: scheduled.Post.ID, Status: "published"})
+	if err == nil {
+		t.Fatal("expected unsupported status to be rejected")
+	}
+	if !errors.Is(err, ErrInvalidInput) || !strings.Contains(err.Error(), "unsupported") {
+		t.Fatalf("unexpected status error: %v", err)
+	}
 	_, err = service.SchedulePost(ctx, ScheduleInput{
 		RunID:       created.Run.ID,
 		Platform:    "instagram",
@@ -114,7 +128,7 @@ func TestServiceCreateReviseAndRenderCarouselRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(details.Briefs) != 2 || len(details.Revisions) != 1 || len(details.Artifacts) == 0 || len(details.Schedules) != 1 {
+	if len(details.Briefs) != 2 || len(details.Revisions) != 1 || len(details.Artifacts) == 0 || len(details.Schedules) != 1 || details.Schedules[0].Status != "cancelled" {
 		t.Fatalf("unexpected run details: %#v", details)
 	}
 	history, err := os.ReadFile(filepath.Join(service.Files.RunDir(created.Run.ID), "history.md"))
@@ -124,7 +138,7 @@ func TestServiceCreateReviseAndRenderCarouselRun(t *testing.T) {
 	if !strings.Contains(string(history), "Make the hook sharper") {
 		t.Fatalf("history missing revision instruction:\n%s", history)
 	}
-	if !strings.Contains(string(history), "scheduled instagram post") {
+	if !strings.Contains(string(history), "scheduled instagram post") || !strings.Contains(string(history), "cancelled scheduled instagram post") {
 		t.Fatalf("history missing schedule entry:\n%s", history)
 	}
 }

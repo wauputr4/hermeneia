@@ -112,6 +112,15 @@ func TestServerContentRunWorkflow(t *testing.T) {
 	if len(scheduleList.ScheduledPosts) != 1 || scheduleList.ScheduledPosts[0].ID != scheduled.Post.ID {
 		t.Fatalf("schedule list mismatch: %#v", scheduleList.ScheduledPosts)
 	}
+	cancelled := request(t, handler, http.MethodPatch, "/v1/scheduled-posts/"+scheduled.Post.ID, `{"status":"cancelled"}`)
+	assertStatus(t, cancelled, http.StatusOK)
+	var cancelledPost schedulePostResponse
+	decodeResponse(t, cancelled, &cancelledPost)
+	if cancelledPost.Post.Status != "cancelled" {
+		t.Fatalf("unexpected cancelled schedule response: %#v", cancelledPost)
+	}
+	invalidStatus := request(t, handler, http.MethodPatch, "/v1/scheduled-posts/"+scheduled.Post.ID, `{"status":"published"}`)
+	assertStatus(t, invalidStatus, http.StatusBadRequest)
 	var previewArtifact artifactResponse
 	for _, artifact := range renderResult.Artifacts {
 		if artifact.Kind == "carousel_png" {

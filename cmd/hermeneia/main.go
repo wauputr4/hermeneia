@@ -86,6 +86,8 @@ func (c command) run(ctx context.Context, args []string) error {
 		return c.audit(ctx, args[1:])
 	case "schedule":
 		return c.schedule(ctx, args[1:])
+	case "cancel-schedule":
+		return c.cancelSchedule(ctx, args[1:])
 	case "schedules":
 		return c.schedules(ctx, args[1:])
 	case "serve":
@@ -370,6 +372,27 @@ func (c command) schedules(ctx context.Context, args []string) error {
 			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", post.ID, post.RunID, post.Platform, post.Status, post.ScheduledAt.Format(time.RFC3339))
 		}
 		return w.Flush()
+	})
+}
+
+func (c command) cancelSchedule(ctx context.Context, args []string) error {
+	fs := c.flagSet("cancel-schedule")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 1 {
+		return fmt.Errorf("cancel-schedule requires exactly one schedule id")
+	}
+	return c.withService(ctx, func(s *workflow.Service) error {
+		result, err := s.UpdateScheduledPostStatus(ctx, workflow.ScheduleStatusInput{
+			ScheduleID: fs.Arg(0),
+			Status:     "cancelled",
+		})
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(c.stdout, "cancelled scheduled %s post %s for run %s\n", result.Post.Platform, result.Post.ID, result.Run.ID)
+		return nil
 	})
 }
 
@@ -672,6 +695,7 @@ Usage:
   hermeneia render            render/export run artifacts
   hermeneia audit             audit artifact file integrity for a run
   hermeneia schedule          create a scheduled publishing record
+  hermeneia cancel-schedule   mark a scheduled publishing record cancelled
   hermeneia schedules         list scheduled publishing records
   hermeneia serve             run the local HTTP API
 
@@ -692,5 +716,6 @@ Examples:
   hermeneia render <run-id>
   hermeneia audit <run-id>
   hermeneia schedule <run-id> --platform instagram --at 2026-05-10T02:00:00Z
+  hermeneia cancel-schedule <schedule-id>
   hermeneia serve --addr 127.0.0.1:19318`)
 }
