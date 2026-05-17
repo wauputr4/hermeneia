@@ -52,6 +52,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /v1/runs/{runID}", s.handleDeleteRun)
 	s.mux.HandleFunc("GET /v1/runs/{runID}/briefs", s.handleListBriefs)
 	s.mux.HandleFunc("GET /v1/runs/{runID}/artifacts", s.handleListArtifacts)
+	s.mux.HandleFunc("GET /v1/runs/{runID}/artifact-audit", s.handleArtifactAudit)
 	s.mux.HandleFunc("GET /v1/runs/{runID}/artifacts/{artifactID}/file", s.handleArtifactFile)
 	s.mux.HandleFunc("POST /v1/runs/{runID}/revisions", s.handleReviseRun)
 	s.mux.HandleFunc("POST /v1/runs/{runID}/render", s.handleRenderRun)
@@ -210,6 +211,20 @@ func (s *Server) handleListArtifacts(w http.ResponseWriter, r *http.Request) {
 		artifacts = append(artifacts, newArtifactResponse(artifact))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"artifacts": artifacts})
+}
+
+func (s *Server) handleArtifactAudit(w http.ResponseWriter, r *http.Request) {
+	result, err := s.service.AuditRunArtifacts(r.Context(), r.PathValue("runID"))
+	if err == nil {
+		writeJSON(w, http.StatusOK, newArtifactAuditResponse(result))
+		return
+	}
+	var auditErr workflow.ArtifactAuditError
+	if errors.As(err, &auditErr) {
+		writeJSON(w, http.StatusConflict, newArtifactAuditResponse(result))
+		return
+	}
+	writeServiceError(w, err)
 }
 
 func (s *Server) handleArtifactFile(w http.ResponseWriter, r *http.Request) {
@@ -419,6 +434,19 @@ type workflowRunResponse struct {
 	Artifacts        []artifactResponse `json:"artifacts,omitempty"`
 }
 
+type artifactAuditResponse struct {
+	Run     runResponse                  `json:"run"`
+	Healthy bool                         `json:"healthy"`
+	Issues  []artifactAuditIssueResponse `json:"issues"`
+}
+
+type artifactAuditIssueResponse struct {
+	Kind       string `json:"kind"`
+	ArtifactID string `json:"artifact_id,omitempty"`
+	Path       string `json:"path,omitempty"`
+	Message    string `json:"message"`
+}
+
 type reviseRunResponse struct {
 	Run       runResponse   `json:"run"`
 	Previous  briefResponse `json:"previous"`
@@ -538,6 +566,23 @@ func newWorkflowRunResponse(result workflow.WorkflowRunResult) workflowRunRespon
 		out.Artifacts = append(out.Artifacts, newArtifactResponse(artifact))
 	}
 	return out
+}
+
+func newArtifactAuditResponse(result workflow.ArtifactAuditResult) artifactAuditResponse {
+	issues := make([]artifactAuditIssueResponse, 0, len(result.Issues))
+	for _, issue := range result.Issues {
+		issues = append(issues, artifactAuditIssueResponse{
+			Kind:       issue.Kind,
+			ArtifactID: issue.ArtifactID,
+			Path:       issue.Path,
+			Message:    issue.Message,
+		})
+	}
+	return artifactAuditResponse{
+		Run:     newRunResponse(result.Run),
+		Healthy: len(issues) == 0,
+		Issues:  issues,
+	}
 }
 
 func newRunDetailsResponse(details workflow.RunDetails) runDetailsResponse {
