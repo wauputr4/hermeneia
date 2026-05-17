@@ -371,6 +371,10 @@ func (r *Repository) GetScheduledPost(ctx context.Context, id string) (Scheduled
 	}
 	return post, err
 }
+func (r *Repository) UpdateScheduledPostStatus(ctx context.Context, id, status string) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE scheduled_posts SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, status, id)
+	return err
+}
 func (r *Repository) ListScheduledPosts(ctx context.Context) ([]ScheduledPost, error) {
 	return r.listScheduledPosts(ctx, `SELECT id, run_id, artifact_id, platform, scheduled_at, status, validation_json, created_at, updated_at FROM scheduled_posts ORDER BY scheduled_at ASC, id ASC`)
 }

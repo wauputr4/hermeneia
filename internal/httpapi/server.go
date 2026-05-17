@@ -58,6 +58,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/runs/{runID}/render", s.handleRenderRun)
 	s.mux.HandleFunc("POST /v1/runs/{runID}/schedule", s.handleSchedulePost)
 	s.mux.HandleFunc("GET /v1/scheduled-posts", s.handleListScheduledPosts)
+	s.mux.HandleFunc("PATCH /v1/scheduled-posts/{scheduleID}", s.handleUpdateScheduledPost)
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -340,6 +341,25 @@ func (s *Server) handleListScheduledPosts(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, map[string]any{"scheduled_posts": out})
 }
 
+func (s *Server) handleUpdateScheduledPost(w http.ResponseWriter, r *http.Request) {
+	var req scheduleStatusRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.service.UpdateScheduledPostStatus(r.Context(), workflow.ScheduleStatusInput{
+		ScheduleID: r.PathValue("scheduleID"),
+		Status:     req.Status,
+	})
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, schedulePostResponse{
+		Run:  newRunResponse(result.Run),
+		Post: newScheduledPostResponse(result.Post),
+	})
+}
+
 type createRunRequest struct {
 	WorkflowID     string                    `json:"workflow_id"`
 	Topic          string                    `json:"topic"`
@@ -412,6 +432,10 @@ func (r schedulePostRequest) toInput(runID string) workflow.ScheduleInput {
 		Platform:    r.Platform,
 		ScheduledAt: r.ScheduledAt,
 	}
+}
+
+type scheduleStatusRequest struct {
+	Status string `json:"status"`
 }
 
 type createRunResponse struct {

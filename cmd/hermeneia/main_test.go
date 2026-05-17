@@ -33,6 +33,7 @@ func TestHelpOutputIncludesMVPCommandSurface(t *testing.T) {
 		"hermeneia render",
 		"hermeneia audit",
 		"hermeneia schedule",
+		"hermeneia cancel-schedule",
 		"hermeneia schedules",
 		"hermeneia serve",
 		"HERMENEIA_DATABASE_PATH",
@@ -373,6 +374,7 @@ func TestCLIContentRunWorkflow(t *testing.T) {
 	if !strings.Contains(stdout.String(), "scheduled instagram post") {
 		t.Fatalf("unexpected schedule output:\n%s", stdout.String())
 	}
+	instagramScheduleID := strings.Fields(stdout.String())[3]
 
 	stdout.Reset()
 	if err := cmd.run(ctx, []string{"schedule", "--run=run-cli", "--platform=linkedin", "--at=2026-05-10T03:00:00Z"}); err != nil {
@@ -388,6 +390,22 @@ func TestCLIContentRunWorkflow(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "instagram") || !strings.Contains(stdout.String(), "linkedin") || !strings.Contains(stdout.String(), "scheduled") {
 		t.Fatalf("unexpected schedules output:\n%s", stdout.String())
+	}
+
+	stdout.Reset()
+	if err := cmd.run(ctx, []string{"cancel-schedule", instagramScheduleID}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "cancelled scheduled instagram post") {
+		t.Fatalf("unexpected cancel-schedule output:\n%s", stdout.String())
+	}
+
+	stdout.Reset()
+	if err := cmd.run(ctx, []string{"schedules"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "cancelled") {
+		t.Fatalf("expected cancelled status in schedules output:\n%s", stdout.String())
 	}
 
 	stdout.Reset()
