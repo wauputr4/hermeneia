@@ -15,6 +15,9 @@ import {
 	formatShortDate,
 	latestBrief,
 	runSummary,
+	filteredSchedulePosts,
+	scheduleAgendaEmptyMessage,
+	scheduleAgendaFilterOptions,
 	scheduleAgendaRows,
 	scheduleArtifactOptions,
 	schedulePostPayload,
@@ -207,6 +210,29 @@ describe('web view model helpers', () => {
 				['schedule-1', true],
 				['schedule-2', false]
 			]
+		);
+	});
+
+	it('filters scheduled-post agenda rows by status and platform', () => {
+		const posts = [
+			{ id: 'schedule-3', run_id: 'run-1', platform: 'linkedin', status: 'cancelled', scheduled_at: '2026-05-18T11:00:00Z' },
+			{ id: 'schedule-1', run_id: 'run-1', platform: 'instagram', status: 'scheduled', scheduled_at: '2026-05-18T09:00:00Z' },
+			{ id: 'schedule-2', run_id: 'run-1', platform: 'linkedin', status: 'scheduled', scheduled_at: '2026-05-18T10:00:00Z' }
+		];
+
+		assert.deepEqual(scheduleAgendaFilterOptions(posts, 'status'), ['cancelled', 'scheduled']);
+		assert.deepEqual(scheduleAgendaFilterOptions(posts, 'platform'), ['instagram', 'linkedin']);
+		assert.deepEqual(
+			filteredSchedulePosts(posts, { status: 'scheduled', platform: 'linkedin' }).map((post) => post.id),
+			['schedule-2']
+		);
+		assert.deepEqual(
+			scheduleAgendaRows(posts, [], { status: 'scheduled', platform: 'all' }).map((row) => row.id),
+			['schedule-1', 'schedule-2']
+		);
+		assert.equal(
+			scheduleAgendaEmptyMessage({ status: 'cancelled', platform: 'instagram' }),
+			'No cancelled instagram posts match these filters.'
 		);
 	});
 

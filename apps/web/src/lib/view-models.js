@@ -74,9 +74,38 @@ export function schedulePostPayload(form) {
 	};
 }
 
-export function scheduleAgendaRows(posts, runs = []) {
+export function scheduleAgendaFilterOptions(posts, field) {
+	return [...new Set((posts ?? []).map((post) => post?.[field]).filter(Boolean))].sort();
+}
+
+export function filteredSchedulePosts(posts, filters = {}) {
+	const status = filters.status ?? 'all';
+	const platform = filters.platform ?? 'all';
+	return (posts ?? []).filter((post) => {
+		const matchesStatus = status === 'all' || post.status === status;
+		const matchesPlatform = platform === 'all' || post.platform === platform;
+		return matchesStatus && matchesPlatform;
+	});
+}
+
+export function scheduleAgendaEmptyMessage(filters = {}) {
+	const status = filters.status ?? 'all';
+	const platform = filters.platform ?? 'all';
+	if (status === 'all' && platform === 'all') {
+		return 'No local scheduled posts yet.';
+	}
+	if (status !== 'all' && platform !== 'all') {
+		return `No ${status} ${platform} posts match these filters.`;
+	}
+	if (status !== 'all') {
+		return `No ${status} posts match this filter.`;
+	}
+	return `No ${platform} posts match this filter.`;
+}
+
+export function scheduleAgendaRows(posts, runs = [], filters = {}) {
 	const runsByID = new Map((runs ?? []).map((run) => [run.id, run]));
-	return [...(posts ?? [])].sort(compareTimestamp('scheduled_at')).map((post) => {
+	return filteredSchedulePosts(posts, filters).sort(compareTimestamp('scheduled_at')).map((post) => {
 		const run = runsByID.get(post.run_id);
 		return {
 			id: post.id,
