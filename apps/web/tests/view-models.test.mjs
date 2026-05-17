@@ -11,9 +11,12 @@ import {
 	auditIssueRows,
 	auditStatusLabel,
 	createRunPayload,
+	defaultScheduleDateTime,
 	formatShortDate,
 	latestBrief,
 	runSummary,
+	scheduleArtifactOptions,
+	schedulePostPayload,
 	templateContentTypeLabel,
 	templateForType,
 	templateLabel,
@@ -112,6 +115,37 @@ describe('web view model helpers', () => {
 				}
 			]
 		);
+	});
+
+	it('builds schedule artifact options without research artifacts', () => {
+		assert.deepEqual(
+			scheduleArtifactOptions([
+				{ id: 'research-1', kind: 'research_json', path: 'runs/run-1/research.json' },
+				{ id: 'slide-1', kind: 'carousel_png', path: 'runs/run-1/output/carousel/slide-01.png' },
+				{ id: 'caption-1', kind: 'caption_text', path: 'runs/run-1/output/caption.txt' },
+				{ kind: 'content_json', path: 'runs/run-1/output/content.json' }
+			]),
+			[
+				{ id: 'slide-1', label: 'carousel png / slide-01.png' },
+				{ id: 'caption-1', label: 'caption text / caption.txt' }
+			]
+		);
+	});
+
+	it('builds schedule payloads with RFC3339 timestamps', () => {
+		assert.deepEqual(
+			schedulePostPayload({
+				artifact_id: 'artifact-1',
+				platform: 'instagram',
+				scheduled_at: '2026-05-18T09:30'
+			}),
+			{
+				artifact_id: 'artifact-1',
+				platform: 'instagram',
+				scheduled_at: '2026-05-18T09:30:00.000Z'
+			}
+		);
+		assert.equal(defaultScheduleDateTime(new Date('2026-05-18T08:30:00Z')).length, 16);
 	});
 
 	it('builds dashboard summary counters from loaded details', () => {

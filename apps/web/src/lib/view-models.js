@@ -57,6 +57,29 @@ export function auditIssueRows(audit) {
 	}));
 }
 
+export function scheduleArtifactOptions(artifacts) {
+	return (artifacts ?? [])
+		.filter((artifact) => artifact.id && artifact.kind !== 'research_json')
+		.map((artifact) => ({
+			id: artifact.id,
+			label: `${artifactKindLabel(artifact.kind)} / ${artifactDisplayName(artifact)}`
+		}));
+}
+
+export function schedulePostPayload(form) {
+	return {
+		artifact_id: form.artifact_id,
+		platform: form.platform,
+		scheduled_at: new Date(form.scheduled_at).toISOString()
+	};
+}
+
+export function defaultScheduleDateTime(now = new Date()) {
+	const nextHour = new Date(now.getTime() + 60 * 60 * 1000);
+	const local = new Date(nextHour.getTime() - nextHour.getTimezoneOffset() * 60 * 1000);
+	return local.toISOString().slice(0, 16);
+}
+
 export function runSummary(run, details) {
 	const latest = details ? latestBrief(details.briefs) : null;
 	const artifactCount = details ? details.artifacts.length : 0;

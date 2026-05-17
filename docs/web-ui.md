@@ -14,6 +14,7 @@ The MVP slice supports:
 - previewing image/video artifacts while keeping text/json artifacts compact,
 - opening or downloading individual artifacts through the local API file endpoint,
 - running the read-only artifact integrity audit for the selected run,
+- creating local schedule records for rendered artifacts,
 - creating a run with a workflow-aware and template-aware form,
 - reviewing selected workflow metadata and ordered steps before run creation,
 - viewing a derived step timeline for the selected run,
@@ -65,6 +66,21 @@ Run detail shows a derived timeline from existing run data:
 - revision events,
 - render artifacts,
 - scheduled publishing records.
+
+## Local Scheduling
+
+The run detail operations panel can create a local schedule record after a run
+has at least one non-research artifact. The form sends:
+
+```text
+POST /v1/runs/{run_id}/schedule
+```
+
+Users choose an artifact, a supported platform, and a future browser-local date
+and time. The UI converts the selected time to an RFC3339 timestamp for the API,
+then refreshes the selected run so the step timeline shows the new scheduled
+post. This is local metadata only: the MVP does not store platform credentials
+and does not call Meta, YouTube, TikTok, LinkedIn, or other publishing APIs.
 
 ## Artifact Browser
 

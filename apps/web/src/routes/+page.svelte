@@ -8,6 +8,7 @@
 		listWorkflows,
 		renderRun,
 		reviseRun,
+		scheduleRun,
 		showRun,
 		type ArtifactAuditResult,
 		type BriefVersion,
@@ -26,9 +27,12 @@
 		auditIssueRows,
 		auditStatusLabel,
 		createRunPayload,
+		defaultScheduleDateTime,
 		formatShortDate,
 		latestBrief,
 		runSummary,
+		scheduleArtifactOptions,
+		schedulePostPayload,
 		templateContentTypeLabel,
 		templateForType,
 		templateLabel,
@@ -59,6 +63,12 @@
 	let artifactAudit = $state<ArtifactAuditResult | null>(null);
 	let auditBusy = $state(false);
 	let auditError = $state('');
+	let scheduleError = $state('');
+	let scheduleForm = $state({
+		artifact_id: '',
+		platform: 'instagram',
+		scheduled_at: defaultScheduleDateTime()
+	});
 	let createForm = $state({
 		workflow_id: '',
 		topic: 'AI agents in marketing',
@@ -94,6 +104,7 @@
 	);
 	const selectedRunTimeline = $derived(workflowTimeline(selectedDetails));
 	const artifactAuditRows = $derived(auditIssueRows(artifactAudit));
+	const scheduleOptions = $derived(selectedDetails ? scheduleArtifactOptions(selectedDetails.artifacts) : []);
 
 	onMount(async () => {
 		await Promise.all([loadTemplates(), loadWorkflows(), loadRuns()]);
@@ -155,11 +166,13 @@
 		error = '';
 		artifactAudit = null;
 		auditError = '';
+		scheduleError = '';
 		try {
 			selectedDetails = await showRun(runID);
 			if (artifactKindFilter !== 'all' && !artifactKindOptions(selectedDetails.artifacts).includes(artifactKindFilter)) {
 				artifactKindFilter = 'all';
 			}
+			syncScheduleArtifact();
 		} catch (err) {
 			selectedDetails = null;
 			error = err instanceof Error ? err.message : 'Unable to load run details';
@@ -219,6 +232,23 @@
 		}
 	}
 
+	async function submitSchedule() {
+		if (!selectedRunID || !scheduleForm.artifact_id) return;
+		busy = true;
+		error = '';
+		scheduleError = '';
+		notice = '';
+		try {
+			await scheduleRun(selectedRunID, schedulePostPayload(scheduleForm));
+			notice = 'Schedule record created';
+			await selectRun(selectedRunID);
+		} catch (err) {
+			scheduleError = err instanceof Error ? err.message : 'Unable to schedule run';
+		} finally {
+			busy = false;
+		}
+	}
+
 	async function submitArtifactAudit() {
 		if (!selectedRunID) return;
 		auditBusy = true;
@@ -258,6 +288,16 @@
 			return;
 		}
 		createForm.template_id = templateForType(templates, createForm.content_type);
+	}
+
+	function syncScheduleArtifact() {
+		const options = selectedDetails ? scheduleArtifactOptions(selectedDetails.artifacts) : [];
+		if (!options.some((option) => option.id === scheduleForm.artifact_id)) {
+			scheduleForm.artifact_id = options[0]?.id ?? '';
+		}
+		if (!scheduleForm.scheduled_at) {
+			scheduleForm.scheduled_at = defaultScheduleDateTime();
+		}
 	}
 </script>
 
@@ -377,6 +417,45 @@
 							<button type="submit" disabled={busy || !revisionInstruction.trim()}>Save revision</button>
 						</form>
 						<button type="button" class="primary" onclick={submitRender} disabled={busy}>Render export</button>
+						<form
+							class="schedule-form"
+							onsubmit={(event) => {
+								event.preventDefault();
+								submitSchedule();
+							}}
+						>
+							<h4>Local Schedule</h4>
+							<label>
+								Artifact
+								<select bind:value={scheduleForm.artifact_id} disabled={busy || scheduleOptions.length === 0}>
+									{#if scheduleOptions.length === 0}
+										<option value="">Render an artifact first</option>
+									{:else}
+										{#each scheduleOptions as option}
+											<option value={option.id}>{option.label}</option>
+										{/each}
+									{/if}
+								</select>
+							</label>
+							<label>
+								Platform
+								<select bind:value={scheduleForm.platform}>
+									<option value="instagram">Instagram</option>
+									<option value="facebook">Facebook</option>
+									<option value="youtube">YouTube</option>
+									<option value="tiktok">TikTok</option>
+									<option value="linkedin">LinkedIn</option>
+								</select>
+							</label>
+							<label>
+								Time
+								<input type="datetime-local" bind:value={scheduleForm.scheduled_at} required />
+							</label>
+							{#if scheduleError}
+								<p class="field-note error-text">{scheduleError}</p>
+							{/if}
+							<button type="submit" disabled={busy || !scheduleForm.artifact_id || !scheduleForm.scheduled_at}>Save schedule</button>
+						</form>
 					</section>
 				</div>
 
@@ -852,6 +931,18 @@
 		padding: 5px 8px;
 		font-family: 'Courier New', monospace;
 		font-size: 0.75rem;
+	}
+
+	.schedule-form {
+		margin-top: 16px;
+		border-top: 2px solid #1d241f;
+		padding-top: 14px;
+	}
+
+	.schedule-form h4 {
+		font-family: 'Courier New', monospace;
+		font-size: 0.78rem;
+		text-transform: uppercase;
 	}
 
 		.artifact-group {
