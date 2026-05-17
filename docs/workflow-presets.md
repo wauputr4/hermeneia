@@ -118,6 +118,18 @@ creates normal run metadata and `brief.v1.json`, `research_plan` requires
 source URLs and writes `research.json`, and `render` creates the standard
 artifact records and files.
 
+Create-run execution currently supports these ordered step sequences:
+
+- `create_brief`
+- `create_brief` -> `render`
+- `research_plan` -> `create_brief`
+- `research_plan` -> `create_brief` -> `render`
+
+Other valid catalog step types, including `revise_brief` and
+`schedule_record`, remain authoring metadata until dedicated execution flows are
+implemented. Create-run execution fails fast if a preset includes unsupported
+step types or puts supported steps in an unsupported order.
+
 ## Examples
 
 - `examples/workflows/local-simple-carousel.json` contains a preset that pairs

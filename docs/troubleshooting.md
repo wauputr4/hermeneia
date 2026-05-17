@@ -217,6 +217,19 @@ Notes:
 Workflow presets live under `workflows/` as JSON contracts that map named flows
 to existing service steps. They intentionally do not execute arbitrary scripts.
 
+## 2026-05-17 — Workflow preset execution limits
+
+`hermeneia create --workflow <id>` and `POST /v1/runs` with `workflow_id`
+support only ordered create-run sequences: `create_brief`, `create_brief` then
+`render`, `research_plan` then `create_brief`, and `research_plan` then
+`create_brief` then `render`.
+
+If execution fails with an unsupported step order error, inspect the preset's
+`steps` array. `revise_brief`, `schedule_record`, and reordered research steps
+are valid catalog metadata, but they are not executed during create-run flows
+yet. Use the normal revise or schedule commands after creating the run, or split
+the preset into a supported create-run sequence.
+
 Notes:
 
 - Presets must use supported content types: `carousel` or `short_video`.

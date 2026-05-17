@@ -167,7 +167,7 @@ func TestServerRejectsArtifactFileSymlinkEscape(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	file := request(t, New(service), http.MethodGet, "/v1/runs/"+runID+"/artifacts/artifact-symlink/file", "")
+	file := request(t, New(&service), http.MethodGet, "/v1/runs/"+runID+"/artifacts/artifact-symlink/file", "")
 
 	assertStatus(t, file, http.StatusBadRequest)
 }
@@ -259,7 +259,7 @@ func TestServerTemplateCatalogIncludesCustomRoots(t *testing.T) {
 	}
 	service := newTestService(t)
 	service.Templates = catalog
-	handler := New(service)
+	handler := New(&service)
 
 	list := request(t, handler, http.MethodGet, "/v1/templates", "")
 	assertStatus(t, list, http.StatusOK)
@@ -369,7 +369,8 @@ func TestServerRejectsNonLoopbackCORSOrigin(t *testing.T) {
 
 func newTestHandler(t *testing.T) http.Handler {
 	t.Helper()
-	return New(newTestService(t))
+	service := newTestService(t)
+	return New(&service)
 }
 
 func newTestService(t *testing.T) workflow.Service {

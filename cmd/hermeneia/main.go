@@ -114,7 +114,7 @@ func (c command) create(ctx context.Context, args []string) error {
 	if input.Topic == "" && fs.NArg() > 0 {
 		input.Topic = strings.Join(fs.Args(), " ")
 	}
-	return c.withService(ctx, func(s workflow.Service) error {
+	return c.withService(ctx, func(s *workflow.Service) error {
 		if strings.TrimSpace(workflowID) != "" {
 			result, err := s.CreateRunFromWorkflowPreset(ctx, workflow.WorkflowRunInput{
 				WorkflowID:     workflowID,
@@ -155,7 +155,7 @@ func (c command) research(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	return c.withService(ctx, func(s workflow.Service) error {
+	return c.withService(ctx, func(s *workflow.Service) error {
 		result, err := s.CreateRunFromResearch(ctx, input)
 		if err != nil {
 			return err
@@ -173,7 +173,7 @@ func (c command) workflows(ctx context.Context, args []string) error {
 	if fs.NArg() > 0 {
 		return fmt.Errorf("workflows does not accept positional arguments")
 	}
-	return c.withService(ctx, func(s workflow.Service) error {
+	return c.withService(ctx, func(s *workflow.Service) error {
 		presets, err := s.ListWorkflowPresets(ctx)
 		if err != nil {
 			return err
@@ -199,7 +199,7 @@ func (c command) templates(ctx context.Context, args []string) error {
 	if fs.NArg() > 0 {
 		return fmt.Errorf("templates does not accept positional arguments")
 	}
-	return c.withService(ctx, func(s workflow.Service) error {
+	return c.withService(ctx, func(s *workflow.Service) error {
 		manifests, err := s.ListTemplates(ctx)
 		if err != nil {
 			return err
@@ -225,7 +225,7 @@ func (c command) list(ctx context.Context, args []string) error {
 	if fs.NArg() > 0 {
 		return fmt.Errorf("list does not accept positional arguments")
 	}
-	return c.withService(ctx, func(s workflow.Service) error {
+	return c.withService(ctx, func(s *workflow.Service) error {
 		runs, err := s.ListRuns(ctx)
 		if err != nil {
 			return err
@@ -248,7 +248,7 @@ func (c command) show(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	return c.withService(ctx, func(s workflow.Service) error {
+	return c.withService(ctx, func(s *workflow.Service) error {
 		details, err := s.ShowRun(ctx, runID)
 		if err != nil {
 			return err
@@ -273,7 +273,7 @@ func (c command) revise(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	return c.withService(ctx, func(s workflow.Service) error {
+	return c.withService(ctx, func(s *workflow.Service) error {
 		result, err := s.ReviseRun(ctx, runID, instruction)
 		if err != nil {
 			return err
@@ -288,7 +288,7 @@ func (c command) render(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	return c.withService(ctx, func(s workflow.Service) error {
+	return c.withService(ctx, func(s *workflow.Service) error {
 		result, err := s.RenderRun(ctx, runID)
 		if err != nil {
 			return err
@@ -307,7 +307,7 @@ func (c command) schedule(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	return c.withService(ctx, func(s workflow.Service) error {
+	return c.withService(ctx, func(s *workflow.Service) error {
 		result, err := s.SchedulePost(ctx, input)
 		if err != nil {
 			return err
@@ -325,7 +325,7 @@ func (c command) schedules(ctx context.Context, args []string) error {
 	if fs.NArg() > 0 {
 		return fmt.Errorf("schedules does not accept positional arguments")
 	}
-	return c.withService(ctx, func(s workflow.Service) error {
+	return c.withService(ctx, func(s *workflow.Service) error {
 		posts, err := s.ListScheduledPosts(ctx)
 		if err != nil {
 			return err
@@ -352,7 +352,7 @@ func (c command) serve(ctx context.Context, args []string) error {
 	if fs.NArg() > 0 {
 		return fmt.Errorf("serve does not accept positional arguments")
 	}
-	return c.withService(ctx, func(s workflow.Service) error {
+	return c.withService(ctx, func(s *workflow.Service) error {
 		server := &http.Server{Addr: *addr, Handler: httpapi.New(s)}
 		fmt.Fprintf(c.stdout, "serving Hermeneia API at http://%s\n", *addr)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -362,7 +362,7 @@ func (c command) serve(ctx context.Context, args []string) error {
 	})
 }
 
-func (c command) withService(ctx context.Context, fn func(workflow.Service) error) error {
+func (c command) withService(ctx context.Context, fn func(*workflow.Service) error) error {
 	path := storage.DatabasePathFromEnv()
 	db, err := storage.Open(path)
 	if err != nil {
@@ -376,7 +376,7 @@ func (c command) withService(ctx context.Context, fn func(workflow.Service) erro
 	service.Now = c.now
 	service.NewID = c.newID
 	service.Planner = researchPlannerFromEnv()
-	return fn(service)
+	return fn(&service)
 }
 
 func (c command) flagSet(name string) *flag.FlagSet {

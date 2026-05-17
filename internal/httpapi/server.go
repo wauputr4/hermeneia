@@ -21,11 +21,11 @@ import (
 const maxRequestBodyBytes = 1 << 20
 
 type Server struct {
-	service workflow.Service
+	service *workflow.Service
 	mux     *http.ServeMux
 }
 
-func New(service workflow.Service) *Server {
+func New(service *workflow.Service) *Server {
 	server := &Server{service: service, mux: http.NewServeMux()}
 	server.routes()
 	return server

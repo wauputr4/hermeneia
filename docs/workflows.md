@@ -130,3 +130,10 @@ Preset execution stays inside existing Hermeneia service steps. `create_brief`
 creates a normal content run with the preset content type and default template,
 `research_plan` uses the same traceable research-run path, and `render` calls
 the existing renderer. Presets do not execute shell commands or arbitrary code.
+
+Create-run execution honors the preset step order for the supported MVP
+sequences: `create_brief`, `create_brief` followed by `render`,
+`research_plan` followed by `create_brief`, and `research_plan` followed by
+`create_brief` followed by `render`. Other valid catalog step types such as
+`revise_brief` and `schedule_record` are rejected during create-run execution
+until dedicated revision and scheduling execution paths are added.
