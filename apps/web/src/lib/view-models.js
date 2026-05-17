@@ -85,7 +85,8 @@ export function scheduleAgendaRows(posts, runs = []) {
 			platform: post.platform || 'n/a',
 			status: post.status || 'n/a',
 			artifactID: post.artifact_id || 'none',
-			scheduledAt: post.scheduled_at
+			scheduledAt: post.scheduled_at,
+			cancellable: post.status === 'scheduled'
 		};
 	});
 }
