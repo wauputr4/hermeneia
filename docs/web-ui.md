@@ -95,6 +95,12 @@ and artifact ID when present. Agenda loading errors stay isolated from the
 selected run review state so operators can keep inspecting run details even if
 the scheduled-post list fails.
 
+The agenda defaults to the `scheduled` status so active upcoming local records
+stay in focus. Status and platform filters are applied in the browser from the
+existing `GET /v1/scheduled-posts` payload. Operators can switch status to
+`all` or `cancelled` to inspect cancelled local records without changing the
+selected run or run detail review state.
+
 Agenda rows with `scheduled` status can be marked `cancelled` from the Web UI.
 The action sends:
 

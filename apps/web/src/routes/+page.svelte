@@ -34,6 +34,8 @@
 		formatShortDate,
 		latestBrief,
 		runSummary,
+		scheduleAgendaEmptyMessage,
+		scheduleAgendaFilterOptions,
 		scheduleAgendaRows,
 		scheduleArtifactOptions,
 		schedulePostPayload,
@@ -66,6 +68,8 @@
 	let scheduleAgendaError = $state('');
 	let notice = $state('');
 	let cancellingScheduleID = $state('');
+	let agendaStatusFilter = $state('scheduled');
+	let agendaPlatformFilter = $state('all');
 	let revisionInstruction = $state('');
 	let artifactKindFilter = $state('all');
 	let artifactAudit = $state<ArtifactAuditResult | null>(null);
@@ -113,7 +117,11 @@
 	const selectedRunTimeline = $derived(workflowTimeline(selectedDetails));
 	const artifactAuditRows = $derived(auditIssueRows(artifactAudit));
 	const scheduleOptions = $derived(selectedDetails ? scheduleArtifactOptions(selectedDetails.artifacts) : []);
-	const agendaRows = $derived(scheduleAgendaRows(scheduledPosts, runs));
+	const agendaFilters = $derived({ status: agendaStatusFilter, platform: agendaPlatformFilter });
+	const agendaStatusOptions = $derived(scheduleAgendaFilterOptions(scheduledPosts, 'status'));
+	const agendaPlatformOptions = $derived(scheduleAgendaFilterOptions(scheduledPosts, 'platform'));
+	const agendaRows = $derived(scheduleAgendaRows(scheduledPosts, runs, agendaFilters));
+	const agendaEmptyMessage = $derived(scheduleAgendaEmptyMessage(agendaFilters));
 
 	onMount(async () => {
 		await Promise.all([loadTemplates(), loadWorkflows(), loadRuns()]);
@@ -401,12 +409,32 @@
 					<h2>Agenda</h2>
 					<button type="button" class="ghost" onclick={loadScheduleAgenda} disabled={busy || loadingScheduleAgenda}>Refresh</button>
 				</div>
+				<div class="agenda-filters" aria-label="Agenda filters">
+					<label>
+						Status
+						<select bind:value={agendaStatusFilter}>
+							<option value="all">All</option>
+							{#each agendaStatusOptions as status}
+								<option value={status}>{status}</option>
+							{/each}
+						</select>
+					</label>
+					<label>
+						Platform
+						<select bind:value={agendaPlatformFilter}>
+							<option value="all">All</option>
+							{#each agendaPlatformOptions as platform}
+								<option value={platform}>{platform}</option>
+							{/each}
+						</select>
+					</label>
+				</div>
 				{#if scheduleAgendaError}
 					<p class="field-note error-text">{scheduleAgendaError}</p>
 				{:else if loadingScheduleAgenda}
 					<p class="muted">Loading scheduled posts...</p>
 				{:else if agendaRows.length === 0}
-					<p class="muted">No local scheduled posts yet.</p>
+					<p class="muted">{agendaEmptyMessage}</p>
 				{:else}
 					<div class="agenda-list">
 						{#each agendaRows as post}
@@ -918,6 +946,25 @@
 	.agenda-list {
 		display: grid;
 		gap: 10px;
+	}
+
+	.agenda-filters {
+		display: grid;
+		gap: 8px;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.agenda-filters label {
+		display: grid;
+		gap: 4px;
+		font-family: 'Courier New', monospace;
+		font-size: 0.72rem;
+		text-transform: uppercase;
+	}
+
+	.agenda-filters select {
+		min-width: 0;
+		padding: 7px 8px;
 	}
 
 	.agenda-list article {
