@@ -197,6 +197,11 @@ Important guardrails:
   MVP platforms (`instagram`, `facebook`, `youtube`, `tiktok`, `linkedin`);
   unsupported values return `400 Bad Request` instead of falling back to an
   unfiltered list.
+- The Web UI agenda displays schedule validation metadata when available. If
+  the metadata is missing, empty, or not an object, the agenda row should still
+  render without a validation section. Use the validation details to confirm
+  that schedule records are local-only and that platform credentials remain
+  outside SQLite.
 - Use `hermeneia cancel-schedule <schedule-id>` or
   `PATCH /v1/scheduled-posts/{schedule_id}` with `{"status":"cancelled"}` to
   mark a local schedule record cancelled. Other status writes are rejected in

@@ -91,9 +91,13 @@ GET /v1/scheduled-posts
 
 It shows upcoming local schedule records ordered by `scheduled_at`, including
 scheduled time, platform, status, run ID/topic when the run list can resolve it,
-and artifact ID when present. Agenda loading errors stay isolated from the
-selected run review state so operators can keep inspecting run details even if
-the scheduled-post list fails.
+artifact ID when present, and compact validation metadata when the API provides
+it. Validation details stay collapsed inside each row so warnings such as a
+missing selected artifact or external-only credential guardrails are available
+without crowding normal agenda scanning. Missing or malformed validation
+metadata is ignored by the view model. Agenda loading errors stay isolated from
+the selected run review state so operators can keep inspecting run details even
+if the scheduled-post list fails.
 
 The agenda defaults to the `scheduled` status so active upcoming local records
 stay in focus. Status and platform filters are applied in the browser from the

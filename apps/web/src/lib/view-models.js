@@ -103,6 +103,31 @@ export function scheduleAgendaEmptyMessage(filters = {}) {
 	return `No ${platform} posts match this filter.`;
 }
 
+export function scheduleValidationSummary(validation) {
+	if (!validation || typeof validation !== 'object' || Array.isArray(validation)) {
+		return { hasMetadata: false, warning: '', details: [] };
+	}
+	const warning = typeof validation.warning === 'string' ? validation.warning : '';
+	const details = [];
+	if (typeof validation.credential_storage === 'string') {
+		details.push(validation.credential_storage.replaceAll('_', ' '));
+	}
+	if (validation.credentials_stored_in_db === false) {
+		details.push('no credentials in DB');
+	}
+	if (validation.requires_platform_connector === true) {
+		details.push('connector required');
+	}
+	if (typeof validation.artifact_selected === 'boolean') {
+		details.push(validation.artifact_selected ? 'artifact selected' : 'no artifact selected');
+	}
+	return {
+		hasMetadata: warning !== '' || details.length > 0,
+		warning,
+		details
+	};
+}
+
 export function scheduleAgendaRows(posts, runs = [], filters = {}) {
 	const runsByID = new Map((runs ?? []).map((run) => [run.id, run]));
 	return filteredSchedulePosts(posts, filters).sort(compareTimestamp('scheduled_at')).map((post) => {
@@ -115,6 +140,7 @@ export function scheduleAgendaRows(posts, runs = [], filters = {}) {
 			status: post.status || 'n/a',
 			artifactID: post.artifact_id || 'none',
 			scheduledAt: post.scheduled_at,
+			validation: scheduleValidationSummary(post.validation),
 			cancellable: post.status === 'scheduled'
 		};
 	});

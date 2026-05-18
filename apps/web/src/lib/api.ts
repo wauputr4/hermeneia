@@ -73,7 +73,9 @@ export type ScheduledPost = {
 	platform: string;
 	status: string;
 	scheduled_at: string;
+	validation?: Record<string, unknown> | null;
 	created_at: string;
+	updated_at: string;
 };
 
 export type Template = {

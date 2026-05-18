@@ -21,6 +21,7 @@ import {
 	scheduleAgendaRows,
 	scheduleArtifactOptions,
 	schedulePostPayload,
+	scheduleValidationSummary,
 	templateContentTypeLabel,
 	templateForType,
 	templateLabel,
@@ -162,7 +163,14 @@ describe('web view model helpers', () => {
 						artifact_id: '',
 						platform: 'linkedin',
 						status: 'scheduled',
-						scheduled_at: '2026-05-18T10:00:00Z'
+						scheduled_at: '2026-05-18T10:00:00Z',
+						validation: {
+							credential_storage: 'external_only',
+							credentials_stored_in_db: false,
+							requires_platform_connector: true,
+							artifact_selected: false,
+							warning: 'No rendered artifact was selected for the scheduled post.'
+						}
 					},
 					{
 						id: 'schedule-1',
@@ -184,6 +192,11 @@ describe('web view model helpers', () => {
 					status: 'scheduled',
 					artifactID: 'artifact-1',
 					scheduledAt: '2026-05-18T09:00:00Z',
+					validation: {
+						hasMetadata: false,
+						warning: '',
+						details: []
+					},
 					cancellable: true
 				},
 				{
@@ -194,9 +207,32 @@ describe('web view model helpers', () => {
 					status: 'scheduled',
 					artifactID: 'none',
 					scheduledAt: '2026-05-18T10:00:00Z',
+					validation: {
+						hasMetadata: true,
+						warning: 'No rendered artifact was selected for the scheduled post.',
+						details: ['external only', 'no credentials in DB', 'connector required', 'no artifact selected']
+					},
 					cancellable: true
 				}
 			]
+		);
+	});
+
+	it('summarizes scheduled-post validation metadata defensively', () => {
+		assert.deepEqual(scheduleValidationSummary(null), { hasMetadata: false, warning: '', details: [] });
+		assert.deepEqual(scheduleValidationSummary('not-json-object'), { hasMetadata: false, warning: '', details: [] });
+		assert.deepEqual(
+			scheduleValidationSummary({
+				credential_storage: 'external_only',
+				credentials_stored_in_db: false,
+				requires_platform_connector: true,
+				artifact_selected: true
+			}),
+			{
+				hasMetadata: true,
+				warning: '',
+				details: ['external only', 'no credentials in DB', 'connector required', 'artifact selected']
+			}
 		);
 	});
 
