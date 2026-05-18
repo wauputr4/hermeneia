@@ -20,6 +20,7 @@ import {
 	scheduleAgendaEmptyMessage,
 	scheduleAgendaFilterOptions,
 	scheduleAgendaGroups,
+	scheduleAgendaQueryFilters,
 	scheduleAgendaRows,
 	scheduleArtifactOptions,
 	schedulePostPayload,
@@ -274,6 +275,28 @@ describe('web view model helpers', () => {
 		);
 	});
 
+	it('filters scheduled-post agenda rows by inclusive date range', () => {
+		const posts = [
+			{ id: 'schedule-1', run_id: 'run-1', platform: 'instagram', status: 'scheduled', scheduled_at: '2026-05-18T09:00:00Z' },
+			{ id: 'schedule-2', run_id: 'run-1', platform: 'instagram', status: 'scheduled', scheduled_at: '2026-05-18T10:00:00Z' },
+			{ id: 'schedule-3', run_id: 'run-1', platform: 'instagram', status: 'scheduled', scheduled_at: '2026-05-18T11:00:00Z' }
+		];
+
+		assert.deepEqual(
+			filteredSchedulePosts(posts, {
+				status: 'scheduled',
+				platform: 'instagram',
+				from: '2026-05-18T10:00:00Z',
+				to: '2026-05-18T11:00:00Z'
+			}).map((post) => post.id),
+			['schedule-2', 'schedule-3']
+		);
+		assert.equal(
+			scheduleAgendaEmptyMessage({ status: 'all', platform: 'all', from: '2026-05-18T10:00' }),
+			'No posts match this filter.'
+		);
+	});
+
 	it('groups scheduled-post agenda rows by local calendar day', () => {
 		const groups = scheduleAgendaGroups(
 			[
@@ -323,6 +346,47 @@ describe('web view model helpers', () => {
 		assert.equal(
 			scheduledPostsPath({ status: 'cancelled', platform: 'linkedin' }),
 			'/v1/scheduled-posts?status=cancelled&platform=linkedin'
+		);
+		assert.equal(
+			scheduledPostsPath({
+				status: 'scheduled',
+				platform: 'instagram',
+				from: '2026-05-18T09:00:00.000Z',
+				to: '2026-05-19T09:00:00.000Z'
+			}),
+			'/v1/scheduled-posts?status=scheduled&platform=instagram&from=2026-05-18T09%3A00%3A00.000Z&to=2026-05-19T09%3A00%3A00.000Z'
+		);
+	});
+
+	it('normalizes agenda date range filters for scheduled-post API requests', () => {
+		assert.deepEqual(scheduleAgendaQueryFilters({ status: 'all', platform: 'all', from: '', to: '' }), {
+			filters: {},
+			error: ''
+		});
+		assert.deepEqual(
+			scheduleAgendaQueryFilters({
+				status: 'scheduled',
+				platform: 'linkedin',
+				from: '2026-05-18T09:00',
+				to: '2026-05-18T10:00'
+			}),
+			{
+				filters: {
+					status: 'scheduled',
+					platform: 'linkedin',
+					from: '2026-05-18T09:00:00.000Z',
+					to: '2026-05-18T10:00:00.000Z'
+				},
+				error: ''
+			}
+		);
+		assert.equal(
+			scheduleAgendaQueryFilters({ from: '2026-05-18T11:00', to: '2026-05-18T10:00' }).error,
+			'Agenda range start must not be later than range end.'
+		);
+		assert.equal(
+			scheduleAgendaQueryFilters({ from: 'not-a-date' }).error,
+			'Agenda date range must use valid local date and time values.'
 		);
 	});
 

@@ -81,17 +81,23 @@ export function scheduleAgendaFilterOptions(posts, field) {
 export function filteredSchedulePosts(posts, filters = {}) {
 	const status = filters.status ?? 'all';
 	const platform = filters.platform ?? 'all';
+	const from = timestampFilterValue(filters.from);
+	const to = timestampFilterValue(filters.to);
 	return (posts ?? []).filter((post) => {
 		const matchesStatus = status === 'all' || post.status === status;
 		const matchesPlatform = platform === 'all' || post.platform === platform;
-		return matchesStatus && matchesPlatform;
+		const scheduledAt = timestampValue(post?.scheduled_at);
+		const matchesFrom = from === null || scheduledAt >= from;
+		const matchesTo = to === null || scheduledAt <= to;
+		return matchesStatus && matchesPlatform && matchesFrom && matchesTo;
 	});
 }
 
 export function scheduleAgendaEmptyMessage(filters = {}) {
 	const status = filters.status ?? 'all';
 	const platform = filters.platform ?? 'all';
-	if (status === 'all' && platform === 'all') {
+	const hasRange = Boolean(filters.from || filters.to);
+	if (status === 'all' && platform === 'all' && !hasRange) {
 		return 'No local scheduled posts yet.';
 	}
 	if (status !== 'all' && platform !== 'all') {
@@ -100,7 +106,40 @@ export function scheduleAgendaEmptyMessage(filters = {}) {
 	if (status !== 'all') {
 		return `No ${status} posts match this filter.`;
 	}
+	if (platform === 'all') {
+		return 'No posts match this filter.';
+	}
 	return `No ${platform} posts match this filter.`;
+}
+
+export function scheduleAgendaQueryFilters(filters = {}) {
+	const queryFilters = {};
+	if (filters.status && filters.status !== 'all') {
+		queryFilters.status = filters.status;
+	}
+	if (filters.platform && filters.platform !== 'all') {
+		queryFilters.platform = filters.platform;
+	}
+
+	const from = localDateTimeFilterToRFC3339(filters.from);
+	const to = localDateTimeFilterToRFC3339(filters.to);
+	if (from.error) {
+		return { filters: queryFilters, error: from.error };
+	}
+	if (to.error) {
+		return { filters: queryFilters, error: to.error };
+	}
+	if (from.value) {
+		queryFilters.from = from.value;
+	}
+	if (to.value) {
+		queryFilters.to = to.value;
+	}
+	if (from.value && to.value && timestampValue(from.value) > timestampValue(to.value)) {
+		return { filters: queryFilters, error: 'Agenda range start must not be later than range end.' };
+	}
+
+	return { filters: queryFilters, error: '' };
 }
 
 export function scheduleValidationSummary(validation) {
@@ -275,6 +314,26 @@ export function createRunPayload(form) {
 function timestampValue(value) {
 	const timestamp = new Date(value ?? '').getTime();
 	return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function timestampFilterValue(value) {
+	if (!value) {
+		return null;
+	}
+	const timestamp = new Date(value).getTime();
+	return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function localDateTimeFilterToRFC3339(value) {
+	const trimmed = String(value ?? '').trim();
+	if (!trimmed) {
+		return { value: '', error: '' };
+	}
+	const timestamp = new Date(trimmed);
+	if (Number.isNaN(timestamp.getTime())) {
+		return { value: '', error: 'Agenda date range must use valid local date and time values.' };
+	}
+	return { value: timestamp.toISOString(), error: '' };
 }
 
 function compareTimestamp(field) {

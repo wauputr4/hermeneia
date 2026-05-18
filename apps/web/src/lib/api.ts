@@ -147,6 +147,8 @@ export type SchedulePostInput = {
 export type ScheduledPostFilters = {
 	status?: string;
 	platform?: string;
+	from?: string;
+	to?: string;
 };
 
 function apiBase(): string {
