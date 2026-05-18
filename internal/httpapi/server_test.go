@@ -135,8 +135,24 @@ func TestServerContentRunWorkflow(t *testing.T) {
 	if len(scheduleList.ScheduledPosts) != 1 || scheduleList.ScheduledPosts[0].ID != scheduled.Post.ID {
 		t.Fatalf("combined-filter schedule list mismatch: %#v", scheduleList.ScheduledPosts)
 	}
+	rangeFiltered := request(t, handler, http.MethodGet, "/v1/scheduled-posts?from="+scheduledAt+"&to="+scheduledAt, "")
+	assertStatus(t, rangeFiltered, http.StatusOK)
+	decodeResponse(t, rangeFiltered, &scheduleList)
+	if len(scheduleList.ScheduledPosts) != 1 || scheduleList.ScheduledPosts[0].ID != scheduled.Post.ID {
+		t.Fatalf("range-filtered schedule list mismatch: %#v", scheduleList.ScheduledPosts)
+	}
+	combinedRange := request(t, handler, http.MethodGet, "/v1/scheduled-posts?status=scheduled&platform=youtube&from="+scheduledAt+"&to="+youtubeScheduledAt, "")
+	assertStatus(t, combinedRange, http.StatusOK)
+	decodeResponse(t, combinedRange, &scheduleList)
+	if len(scheduleList.ScheduledPosts) != 1 || scheduleList.ScheduledPosts[0].ID != youtubeScheduled.Post.ID {
+		t.Fatalf("combined range-filter schedule list mismatch: %#v", scheduleList.ScheduledPosts)
+	}
 	invalidFilter := request(t, handler, http.MethodGet, "/v1/scheduled-posts?status=queued", "")
 	assertStatus(t, invalidFilter, http.StatusBadRequest)
+	invalidFrom := request(t, handler, http.MethodGet, "/v1/scheduled-posts?from=tomorrow", "")
+	assertStatus(t, invalidFrom, http.StatusBadRequest)
+	invertedRange := request(t, handler, http.MethodGet, "/v1/scheduled-posts?from="+youtubeScheduledAt+"&to="+scheduledAt, "")
+	assertStatus(t, invertedRange, http.StatusBadRequest)
 	cancelled := request(t, handler, http.MethodPatch, "/v1/scheduled-posts/"+scheduled.Post.ID, `{"status":"cancelled"}`)
 	assertStatus(t, cancelled, http.StatusOK)
 	var cancelledPost schedulePostResponse

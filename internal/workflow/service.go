@@ -189,6 +189,8 @@ type ScheduleResult struct {
 type ScheduleListInput struct {
 	Status   string
 	Platform string
+	From     string
+	To       string
 }
 
 type ScheduleStatusInput struct {
@@ -925,7 +927,30 @@ func (s *Service) ListScheduledPostsFiltered(ctx context.Context, input Schedule
 	if platform != "" && !supportedPublishPlatform(platform) {
 		return nil, invalidInput(fmt.Sprintf("unsupported publishing platform %q", input.Platform))
 	}
-	return s.Repo.ListScheduledPostsFiltered(ctx, storage.ScheduledPostFilters{Status: status, Platform: platform})
+	from, err := optionalScheduleTimeFilter("from", input.From)
+	if err != nil {
+		return nil, err
+	}
+	to, err := optionalScheduleTimeFilter("to", input.To)
+	if err != nil {
+		return nil, err
+	}
+	if from != nil && to != nil && from.After(*to) {
+		return nil, invalidInput("from must be before or equal to to")
+	}
+	return s.Repo.ListScheduledPostsFiltered(ctx, storage.ScheduledPostFilters{Status: status, Platform: platform, From: from, To: to})
+}
+
+func optionalScheduleTimeFilter(name, value string) (*time.Time, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, trimmed)
+	if err != nil {
+		return nil, invalidInput(fmt.Sprintf("%s must be a valid RFC3339 timestamp", name))
+	}
+	return &parsed, nil
 }
 
 func (s *Service) UpdateScheduledPostStatus(ctx context.Context, input ScheduleStatusInput) (ScheduleResult, error) {

@@ -191,12 +191,13 @@ Important guardrails:
   list and selected run review can still be used; check the local API server
   logs and verify that `hermeneia schedules` can list records from the same
   SQLite database.
-- `GET /v1/scheduled-posts` accepts optional `status` and `platform` query
-  filters for API-side agenda narrowing. Use supported schedule statuses
+- `GET /v1/scheduled-posts` accepts optional `status`, `platform`, `from`, and
+  `to` query filters for API-side agenda narrowing. Use supported schedule statuses
   (`scheduled`, `publishing`, `published`, `failed`, `cancelled`) and supported
   MVP platforms (`instagram`, `facebook`, `youtube`, `tiktok`, `linkedin`);
   unsupported values return `400 Bad Request` instead of falling back to an
-  unfiltered list.
+  unfiltered list. `from` and `to` must be RFC3339 timestamps, are inclusive,
+  and `from` must not be later than `to`.
 - The Web UI agenda displays schedule validation metadata when available. If
   the metadata is missing, empty, or not an object, the agenda row should still
   render without a validation section. Use the validation details to confirm

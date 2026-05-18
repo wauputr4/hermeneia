@@ -136,6 +136,8 @@ type ScheduledPost struct {
 type ScheduledPostFilters struct {
 	Status   string
 	Platform string
+	From     *time.Time
+	To       *time.Time
 }
 
 type Repository struct{ db *sql.DB }
@@ -394,6 +396,14 @@ func (r *Repository) ListScheduledPostsFiltered(ctx context.Context, filters Sch
 	if filters.Platform != "" {
 		where = append(where, "platform = ?")
 		args = append(args, filters.Platform)
+	}
+	if filters.From != nil {
+		where = append(where, "scheduled_at >= ?")
+		args = append(args, *filters.From)
+	}
+	if filters.To != nil {
+		where = append(where, "scheduled_at <= ?")
+		args = append(args, *filters.To)
 	}
 	if len(where) > 0 {
 		query += " WHERE " + strings.Join(where, " AND ")

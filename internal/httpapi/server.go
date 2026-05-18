@@ -333,6 +333,8 @@ func (s *Server) handleListScheduledPosts(w http.ResponseWriter, r *http.Request
 	posts, err := s.service.ListScheduledPostsFiltered(r.Context(), workflow.ScheduleListInput{
 		Status:   query.Get("status"),
 		Platform: query.Get("platform"),
+		From:     query.Get("from"),
+		To:       query.Get("to"),
 	})
 	if err != nil {
 		writeServiceError(w, err)

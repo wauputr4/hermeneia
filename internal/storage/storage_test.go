@@ -190,6 +190,22 @@ func TestRepositoryListScheduledPostsFiltered(t *testing.T) {
 	if len(combined) != 1 || combined[0].ID != "schedule-1" {
 		t.Fatalf("unexpected combined-filter schedules: %#v", combined)
 	}
+	from := mustTime(t, "2026-05-10T03:00:00Z")
+	to := mustTime(t, "2026-05-10T04:00:00Z")
+	ranged, err := repo.ListScheduledPostsFiltered(ctx, ScheduledPostFilters{From: &from, To: &to})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ranged) != 2 || ranged[0].ID != "schedule-2" || ranged[1].ID != "schedule-3" {
+		t.Fatalf("unexpected range-filtered schedules: %#v", ranged)
+	}
+	combinedRange, err := repo.ListScheduledPostsFiltered(ctx, ScheduledPostFilters{Status: "scheduled", Platform: "youtube", From: &from, To: &to})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(combinedRange) != 1 || combinedRange[0].ID != "schedule-2" {
+		t.Fatalf("unexpected combined range-filtered schedules: %#v", combinedRange)
+	}
 }
 
 func mustTime(t *testing.T, value string) time.Time {
