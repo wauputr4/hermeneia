@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -417,6 +418,33 @@ func TestCLIContentRunWorkflow(t *testing.T) {
 	}
 
 	stdout.Reset()
+	if err := cmd.run(ctx, []string{"schedules", "--json"}); err != nil {
+		t.Fatal(err)
+	}
+	var allScheduleRows []scheduleJSONRow
+	if err := json.Unmarshal(stdout.Bytes(), &allScheduleRows); err != nil {
+		t.Fatalf("schedules --json did not print valid JSON: %v\n%s", err, stdout.String())
+	}
+	if len(allScheduleRows) != 2 {
+		t.Fatalf("expected two JSON schedule rows, got %#v", allScheduleRows)
+	}
+	if allScheduleRows[0].ID == "" || allScheduleRows[0].RunID != "run-cli" || allScheduleRows[0].ScheduledAt.IsZero() || allScheduleRows[0].CreatedAt.IsZero() || allScheduleRows[0].UpdatedAt.IsZero() {
+		t.Fatalf("JSON schedule row missing stable fields: %#v", allScheduleRows[0])
+	}
+
+	stdout.Reset()
+	if err := cmd.run(ctx, []string{"schedules", "--status", "scheduled", "--platform", "instagram", "--json"}); err != nil {
+		t.Fatal(err)
+	}
+	var filteredScheduleRows []scheduleJSONRow
+	if err := json.Unmarshal(stdout.Bytes(), &filteredScheduleRows); err != nil {
+		t.Fatalf("filtered schedules --json did not print valid JSON: %v\n%s", err, stdout.String())
+	}
+	if len(filteredScheduleRows) != 1 || filteredScheduleRows[0].Platform != "instagram" || filteredScheduleRows[0].Status != "scheduled" {
+		t.Fatalf("unexpected filtered JSON schedule rows: %#v", filteredScheduleRows)
+	}
+
+	stdout.Reset()
 	if err := cmd.run(ctx, []string{"cancel-schedule", instagramScheduleID}); err != nil {
 		t.Fatal(err)
 	}
@@ -440,6 +468,7 @@ func TestCLIContentRunWorkflow(t *testing.T) {
 		t.Fatalf("unexpected cancelled-filter schedules output:\n%s", stdout.String())
 	}
 
+	stdout.Reset()
 	err := cmd.run(ctx, []string{"schedules", "--status", "queued"})
 	if err == nil {
 		t.Fatal("expected invalid status error")
@@ -447,13 +476,20 @@ func TestCLIContentRunWorkflow(t *testing.T) {
 	if got := err.Error(); !strings.Contains(got, "unsupported scheduled post status") {
 		t.Fatalf("unexpected invalid status error: %q", got)
 	}
+	if stdout.String() != "" {
+		t.Fatalf("invalid status printed output before failing: %q", stdout.String())
+	}
 
+	stdout.Reset()
 	err = cmd.run(ctx, []string{"schedules", "--platform", "mastodon"})
 	if err == nil {
 		t.Fatal("expected invalid platform error")
 	}
 	if got := err.Error(); !strings.Contains(got, "unsupported publishing platform") {
 		t.Fatalf("unexpected invalid platform error: %q", got)
+	}
+	if stdout.String() != "" {
+		t.Fatalf("invalid platform printed output before failing: %q", stdout.String())
 	}
 
 	stdout.Reset()
