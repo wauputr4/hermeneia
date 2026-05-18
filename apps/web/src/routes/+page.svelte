@@ -35,7 +35,6 @@
 		latestBrief,
 		runSummary,
 		scheduleAgendaEmptyMessage,
-		scheduleAgendaFilterOptions,
 		scheduleAgendaRows,
 		scheduleArtifactOptions,
 		schedulePostPayload,
@@ -90,6 +89,8 @@
 		platform: 'instagram',
 		target_audience: 'content operators'
 	});
+	const agendaStatusOptions = ['scheduled', 'publishing', 'published', 'failed', 'cancelled'];
+	const agendaPlatformOptions = ['instagram', 'facebook', 'youtube', 'tiktok', 'linkedin'];
 
 	$effect(() => {
 		selectedBrief = selectedDetails ? latestBrief(selectedDetails.briefs) : null;
@@ -118,10 +119,16 @@
 	const artifactAuditRows = $derived(auditIssueRows(artifactAudit));
 	const scheduleOptions = $derived(selectedDetails ? scheduleArtifactOptions(selectedDetails.artifacts) : []);
 	const agendaFilters = $derived({ status: agendaStatusFilter, platform: agendaPlatformFilter });
-	const agendaStatusOptions = $derived(scheduleAgendaFilterOptions(scheduledPosts, 'status'));
-	const agendaPlatformOptions = $derived(scheduleAgendaFilterOptions(scheduledPosts, 'platform'));
 	const agendaRows = $derived(scheduleAgendaRows(scheduledPosts, runs, agendaFilters));
 	const agendaEmptyMessage = $derived(scheduleAgendaEmptyMessage(agendaFilters));
+	let previousAgendaFilterKey = $state('scheduled:all');
+
+	$effect(() => {
+		const key = `${agendaStatusFilter}:${agendaPlatformFilter}`;
+		if (key === previousAgendaFilterKey) return;
+		previousAgendaFilterKey = key;
+		loadScheduleAgenda();
+	});
 
 	onMount(async () => {
 		await Promise.all([loadTemplates(), loadWorkflows(), loadRuns()]);
@@ -183,7 +190,7 @@
 		loadingScheduleAgenda = true;
 		scheduleAgendaError = '';
 		try {
-			scheduledPosts = await listScheduledPosts();
+			scheduledPosts = await listScheduledPosts(agendaFilters);
 		} catch (err) {
 			scheduledPosts = [];
 			scheduleAgendaError = err instanceof Error ? err.message : 'Unable to load scheduled posts';

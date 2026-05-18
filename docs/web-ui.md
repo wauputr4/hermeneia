@@ -89,6 +89,12 @@ The sidebar agenda reads:
 GET /v1/scheduled-posts
 ```
 
+The UI sends API query parameters for active agenda filters, such as
+`GET /v1/scheduled-posts?status=scheduled` by default and adding
+`platform={platform}` when a specific platform is selected. Choosing `all`
+omits that query parameter so the API returns the complete local set for that
+dimension.
+
 It shows upcoming local schedule records ordered by `scheduled_at`, including
 scheduled time, platform, status, run ID/topic when the run list can resolve it,
 artifact ID when present, and compact validation metadata when the API provides
@@ -100,10 +106,10 @@ the selected run review state so operators can keep inspecting run details even
 if the scheduled-post list fails.
 
 The agenda defaults to the `scheduled` status so active upcoming local records
-stay in focus. Status and platform filters are applied in the browser from the
-existing `GET /v1/scheduled-posts` payload. Operators can switch status to
-`all` or `cancelled` to inspect cancelled local records without changing the
-selected run or run detail review state.
+stay in focus. Status and platform filters are sent to the API and then applied
+again in the browser as a defensive display fallback. Operators can switch
+status to `all` or `cancelled` to inspect cancelled local records without
+changing the selected run or run detail review state.
 
 Agenda rows with `scheduled` status can be marked `cancelled` from the Web UI.
 The action sends:

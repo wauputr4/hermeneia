@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { scheduledPostsPath } from '../src/lib/api-paths.js';
 import {
 	artifactDisplayName,
 	artifactGroups,
@@ -269,6 +270,17 @@ describe('web view model helpers', () => {
 		assert.equal(
 			scheduleAgendaEmptyMessage({ status: 'cancelled', platform: 'instagram' }),
 			'No cancelled instagram posts match these filters.'
+		);
+	});
+
+	it('builds scheduled-post API paths from agenda filters', () => {
+		assert.equal(scheduledPostsPath(), '/v1/scheduled-posts');
+		assert.equal(scheduledPostsPath({ status: 'all', platform: 'all' }), '/v1/scheduled-posts');
+		assert.equal(scheduledPostsPath({ status: 'scheduled', platform: 'all' }), '/v1/scheduled-posts?status=scheduled');
+		assert.equal(scheduledPostsPath({ status: 'all', platform: 'instagram' }), '/v1/scheduled-posts?platform=instagram');
+		assert.equal(
+			scheduledPostsPath({ status: 'cancelled', platform: 'linkedin' }),
+			'/v1/scheduled-posts?status=cancelled&platform=linkedin'
 		);
 	});
 
