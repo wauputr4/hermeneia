@@ -338,6 +338,20 @@ GET /v1/scheduled-posts
 
 Returns scheduled publishing records ordered by `scheduled_at`.
 
+Optional query parameters:
+
+- `status`: one of `scheduled`, `publishing`, `published`, `failed`, or `cancelled`.
+- `platform`: one of `instagram`, `facebook`, `youtube`, `tiktok`, or `linkedin`.
+
+Filters can be combined, for example:
+
+```http
+GET /v1/scheduled-posts?status=scheduled&platform=instagram
+```
+
+Invalid filter values return `400 Bad Request`. When no query parameters are
+provided, the response shape and ordering remain unchanged.
+
 ### Update Scheduled Post Status
 
 ```http

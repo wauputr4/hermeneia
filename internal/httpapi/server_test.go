@@ -93,6 +93,11 @@ func TestServerContentRunWorkflow(t *testing.T) {
 	if scheduled.Post.Status != "scheduled" || !strings.Contains(string(scheduled.Post.Validation), `"credentials_stored_in_db":false`) {
 		t.Fatalf("unexpected schedule response: %#v", scheduled)
 	}
+	youtubeScheduledAt := time.Now().UTC().Add(2 * time.Hour).Format(time.RFC3339)
+	youtubeSchedule := request(t, handler, http.MethodPost, "/v1/runs/"+created.Run.ID+"/schedule", `{"platform":"youtube","scheduled_at":"`+youtubeScheduledAt+`"}`)
+	assertStatus(t, youtubeSchedule, http.StatusCreated)
+	var youtubeScheduled schedulePostResponse
+	decodeResponse(t, youtubeSchedule, &youtubeScheduled)
 
 	artifacts := request(t, handler, http.MethodGet, "/v1/runs/"+created.Run.ID+"/artifacts", "")
 	assertStatus(t, artifacts, http.StatusOK)
@@ -109,9 +114,29 @@ func TestServerContentRunWorkflow(t *testing.T) {
 		ScheduledPosts []scheduledPostResponse `json:"scheduled_posts"`
 	}
 	decodeResponse(t, schedules, &scheduleList)
-	if len(scheduleList.ScheduledPosts) != 1 || scheduleList.ScheduledPosts[0].ID != scheduled.Post.ID {
+	if len(scheduleList.ScheduledPosts) != 2 || scheduleList.ScheduledPosts[0].ID != scheduled.Post.ID || scheduleList.ScheduledPosts[1].ID != youtubeScheduled.Post.ID {
 		t.Fatalf("schedule list mismatch: %#v", scheduleList.ScheduledPosts)
 	}
+	instagramSchedules := request(t, handler, http.MethodGet, "/v1/scheduled-posts?platform=instagram", "")
+	assertStatus(t, instagramSchedules, http.StatusOK)
+	decodeResponse(t, instagramSchedules, &scheduleList)
+	if len(scheduleList.ScheduledPosts) != 1 || scheduleList.ScheduledPosts[0].Platform != "instagram" {
+		t.Fatalf("platform-filtered schedule list mismatch: %#v", scheduleList.ScheduledPosts)
+	}
+	scheduledSchedules := request(t, handler, http.MethodGet, "/v1/scheduled-posts?status=scheduled", "")
+	assertStatus(t, scheduledSchedules, http.StatusOK)
+	decodeResponse(t, scheduledSchedules, &scheduleList)
+	if len(scheduleList.ScheduledPosts) != 2 || scheduleList.ScheduledPosts[0].Status != "scheduled" || scheduleList.ScheduledPosts[1].Status != "scheduled" {
+		t.Fatalf("status-filtered schedule list mismatch: %#v", scheduleList.ScheduledPosts)
+	}
+	scheduledInstagram := request(t, handler, http.MethodGet, "/v1/scheduled-posts?status=scheduled&platform=instagram", "")
+	assertStatus(t, scheduledInstagram, http.StatusOK)
+	decodeResponse(t, scheduledInstagram, &scheduleList)
+	if len(scheduleList.ScheduledPosts) != 1 || scheduleList.ScheduledPosts[0].ID != scheduled.Post.ID {
+		t.Fatalf("combined-filter schedule list mismatch: %#v", scheduleList.ScheduledPosts)
+	}
+	invalidFilter := request(t, handler, http.MethodGet, "/v1/scheduled-posts?status=queued", "")
+	assertStatus(t, invalidFilter, http.StatusBadRequest)
 	cancelled := request(t, handler, http.MethodPatch, "/v1/scheduled-posts/"+scheduled.Post.ID, `{"status":"cancelled"}`)
 	assertStatus(t, cancelled, http.StatusOK)
 	var cancelledPost schedulePostResponse

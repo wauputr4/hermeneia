@@ -186,6 +186,11 @@ type ScheduleResult struct {
 	Post storage.ScheduledPost
 }
 
+type ScheduleListInput struct {
+	Status   string
+	Platform string
+}
+
 type ScheduleStatusInput struct {
 	ScheduleID string
 	Status     string
@@ -908,7 +913,19 @@ func (s *Service) SchedulePost(ctx context.Context, input ScheduleInput) (Schedu
 }
 
 func (s *Service) ListScheduledPosts(ctx context.Context) ([]storage.ScheduledPost, error) {
-	return s.Repo.ListScheduledPosts(ctx)
+	return s.ListScheduledPostsFiltered(ctx, ScheduleListInput{})
+}
+
+func (s *Service) ListScheduledPostsFiltered(ctx context.Context, input ScheduleListInput) ([]storage.ScheduledPost, error) {
+	status := strings.ToLower(strings.TrimSpace(input.Status))
+	if status != "" && !supportedScheduledPostStatus(status) {
+		return nil, invalidInput(fmt.Sprintf("unsupported scheduled post status %q", input.Status))
+	}
+	platform := normalizePublishPlatform(input.Platform)
+	if platform != "" && !supportedPublishPlatform(platform) {
+		return nil, invalidInput(fmt.Sprintf("unsupported publishing platform %q", input.Platform))
+	}
+	return s.Repo.ListScheduledPostsFiltered(ctx, storage.ScheduledPostFilters{Status: status, Platform: platform})
 }
 
 func (s *Service) UpdateScheduledPostStatus(ctx context.Context, input ScheduleStatusInput) (ScheduleResult, error) {
@@ -1395,6 +1412,15 @@ func normalizePublishPlatform(value string) string {
 func supportedPublishPlatform(platform string) bool {
 	switch platform {
 	case "instagram", "facebook", "youtube", "tiktok", "linkedin":
+		return true
+	default:
+		return false
+	}
+}
+
+func supportedScheduledPostStatus(status string) bool {
+	switch status {
+	case "scheduled", "publishing", "published", "failed", "cancelled":
 		return true
 	default:
 		return false

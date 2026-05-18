@@ -133,6 +133,11 @@ type ScheduledPost struct {
 	ScheduledAt, CreatedAt, UpdatedAt                       time.Time
 }
 
+type ScheduledPostFilters struct {
+	Status   string
+	Platform string
+}
+
 type Repository struct{ db *sql.DB }
 
 func NewRepository(db *sql.DB) *Repository { return &Repository{db: db} }
@@ -376,7 +381,25 @@ func (r *Repository) UpdateScheduledPostStatus(ctx context.Context, id, status s
 	return err
 }
 func (r *Repository) ListScheduledPosts(ctx context.Context) ([]ScheduledPost, error) {
-	return r.listScheduledPosts(ctx, `SELECT id, run_id, artifact_id, platform, scheduled_at, status, validation_json, created_at, updated_at FROM scheduled_posts ORDER BY scheduled_at ASC, id ASC`)
+	return r.ListScheduledPostsFiltered(ctx, ScheduledPostFilters{})
+}
+func (r *Repository) ListScheduledPostsFiltered(ctx context.Context, filters ScheduledPostFilters) ([]ScheduledPost, error) {
+	query := `SELECT id, run_id, artifact_id, platform, scheduled_at, status, validation_json, created_at, updated_at FROM scheduled_posts`
+	var where []string
+	var args []any
+	if filters.Status != "" {
+		where = append(where, "status = ?")
+		args = append(args, filters.Status)
+	}
+	if filters.Platform != "" {
+		where = append(where, "platform = ?")
+		args = append(args, filters.Platform)
+	}
+	if len(where) > 0 {
+		query += " WHERE " + strings.Join(where, " AND ")
+	}
+	query += " ORDER BY scheduled_at ASC, id ASC"
+	return r.listScheduledPosts(ctx, query, args...)
 }
 func (r *Repository) ListScheduledPostsByRun(ctx context.Context, runID string) ([]ScheduledPost, error) {
 	return r.listScheduledPosts(ctx, `SELECT id, run_id, artifact_id, platform, scheduled_at, status, validation_json, created_at, updated_at FROM scheduled_posts WHERE run_id = ? ORDER BY scheduled_at ASC, id ASC`, runID)

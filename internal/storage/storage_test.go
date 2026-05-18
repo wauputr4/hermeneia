@@ -131,6 +131,67 @@ func TestMigrateAndRepositoryCreateRead(t *testing.T) {
 	}
 }
 
+func TestRepositoryListScheduledPostsFiltered(t *testing.T) {
+	ctx := context.Background()
+	db, err := Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	repo := NewRepository(db)
+	if err := repo.CreateTemplate(ctx, Template{ID: "tpl-1", Name: "Clean Carousel", ContentType: "carousel"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.CreateContentRun(ctx, ContentRun{ID: "run-1", Topic: "AI agents", ContentType: "carousel", TemplateID: "tpl-1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.CreateContentRun(ctx, ContentRun{ID: "run-2", Topic: "Video agents", ContentType: "carousel", TemplateID: "tpl-1"}); err != nil {
+		t.Fatal(err)
+	}
+	posts := []ScheduledPost{
+		{ID: "schedule-1", RunID: "run-1", Platform: "instagram", ScheduledAt: mustTime(t, "2026-05-10T02:00:00Z"), Status: "scheduled"},
+		{ID: "schedule-2", RunID: "run-2", Platform: "youtube", ScheduledAt: mustTime(t, "2026-05-10T03:00:00Z"), Status: "scheduled"},
+		{ID: "schedule-3", RunID: "run-1", Platform: "instagram", ScheduledAt: mustTime(t, "2026-05-10T04:00:00Z"), Status: "cancelled"},
+	}
+	for _, post := range posts {
+		if err := repo.CreateScheduledPost(ctx, post); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	unfiltered, err := repo.ListScheduledPostsFiltered(ctx, ScheduledPostFilters{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(unfiltered) != 3 || unfiltered[0].ID != "schedule-1" || unfiltered[2].ID != "schedule-3" {
+		t.Fatalf("unexpected unfiltered schedules: %#v", unfiltered)
+	}
+	scheduled, err := repo.ListScheduledPostsFiltered(ctx, ScheduledPostFilters{Status: "scheduled"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(scheduled) != 2 || scheduled[0].ID != "schedule-1" || scheduled[1].ID != "schedule-2" {
+		t.Fatalf("unexpected status-filtered schedules: %#v", scheduled)
+	}
+	instagram, err := repo.ListScheduledPostsFiltered(ctx, ScheduledPostFilters{Platform: "instagram"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(instagram) != 2 || instagram[0].ID != "schedule-1" || instagram[1].ID != "schedule-3" {
+		t.Fatalf("unexpected platform-filtered schedules: %#v", instagram)
+	}
+	combined, err := repo.ListScheduledPostsFiltered(ctx, ScheduledPostFilters{Status: "scheduled", Platform: "instagram"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(combined) != 1 || combined[0].ID != "schedule-1" {
+		t.Fatalf("unexpected combined-filter schedules: %#v", combined)
+	}
+}
+
 func mustTime(t *testing.T, value string) time.Time {
 	t.Helper()
 	parsed, err := time.Parse(time.RFC3339, value)
