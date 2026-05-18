@@ -457,6 +457,21 @@
 									{/if}
 								</div>
 								<small>{post.runID} / {post.artifactID}</small>
+								{#if post.validation.hasMetadata}
+									<details class:warning={post.validation.warning} class="agenda-validation">
+										<summary>{post.validation.warning ? 'Validation warning' : 'Validation'}</summary>
+										{#if post.validation.warning}
+											<p>{post.validation.warning}</p>
+										{/if}
+										{#if post.validation.details.length > 0}
+											<div>
+												{#each post.validation.details as detail}
+													<span>{detail}</span>
+												{/each}
+											</div>
+										{/if}
+									</details>
+								{/if}
 							</article>
 						{/each}
 					</div>
@@ -1015,6 +1030,44 @@
 	.agenda-list small {
 		color: #657166;
 		word-break: break-word;
+	}
+
+	.agenda-validation {
+		border-top: 1px dashed rgba(29, 36, 31, 0.35);
+		padding-top: 6px;
+	}
+
+	.agenda-validation summary {
+		width: fit-content;
+		cursor: pointer;
+		font-family: 'Courier New', monospace;
+		font-size: 0.72rem;
+		font-weight: 700;
+		text-transform: uppercase;
+	}
+
+	.agenda-validation.warning summary {
+		color: #8b2d1e;
+	}
+
+	.agenda-validation p {
+		margin-top: 6px;
+		font-family: 'Courier New', monospace;
+		font-size: 0.72rem;
+		color: #8b2d1e;
+	}
+
+	.agenda-validation div {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 5px;
+		margin-top: 6px;
+	}
+
+	.agenda-validation span {
+		border: 1px solid rgba(29, 36, 31, 0.45);
+		background: #eef0c0;
+		padding: 2px 5px;
 	}
 
 	.detail {
