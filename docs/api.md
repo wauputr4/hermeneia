@@ -342,15 +342,18 @@ Optional query parameters:
 
 - `status`: one of `scheduled`, `publishing`, `published`, `failed`, or `cancelled`.
 - `platform`: one of `instagram`, `facebook`, `youtube`, `tiktok`, or `linkedin`.
+- `from`: inclusive RFC3339 lower bound for `scheduled_at`.
+- `to`: inclusive RFC3339 upper bound for `scheduled_at`.
 
 Filters can be combined, for example:
 
 ```http
-GET /v1/scheduled-posts?status=scheduled&platform=instagram
+GET /v1/scheduled-posts?status=scheduled&platform=instagram&from=2026-05-10T00:00:00Z&to=2026-05-11T00:00:00Z
 ```
 
-Invalid filter values return `400 Bad Request`. When no query parameters are
-provided, the response shape and ordering remain unchanged.
+Invalid filter values, malformed timestamps, and `from` values after `to`
+return `400 Bad Request`. When no query parameters are provided, the response
+shape and ordering remain unchanged.
 
 ### Update Scheduled Post Status
 
