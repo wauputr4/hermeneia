@@ -225,16 +225,16 @@ Important guardrails:
   should remain visible without a repeated cancel action. Agenda cancellation
   errors are shown in the agenda panel and should not clear the selected run
   review state.
-- The CLI `hermeneia schedules` command accepts `--status` and `--platform`
-  filters using the same validation as the API. Invalid statuses or unsupported
-  platforms return a clear non-zero error; omit either flag to leave that
-  dimension unfiltered.
+- The CLI `hermeneia schedules` command accepts `--status`, `--platform`,
+  `--from`, and `--to` filters using the same validation as the API. Invalid
+  statuses, unsupported platforms, invalid RFC3339 range values, or inverted
+  ranges return a clear non-zero error; omit a flag to leave that dimension
+  unfiltered.
 - Add `--json` to `hermeneia schedules` when automation needs structured rows
   instead of the human table. Filter validation still happens before JSON is
-  printed, so invalid `--status` or `--platform` values should fail with no
-  partial JSON output. Each JSON row includes a `validation` object; rows
-  without stored validation metadata return `{}` so scripts can read the field
-  consistently.
+  printed, so invalid filter values should fail with no partial JSON output.
+  Each JSON row includes a `validation` object; rows without stored validation
+  metadata return `{}` so scripts can read the field consistently.
 
 ## 2026-05-10 — Template manifest loader
 

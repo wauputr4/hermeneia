@@ -356,6 +356,8 @@ func (c command) schedules(ctx context.Context, args []string) error {
 	var jsonOutput bool
 	fs.StringVar(&input.Status, "status", "", "filter by schedule status")
 	fs.StringVar(&input.Platform, "platform", "", "filter by publishing platform")
+	fs.StringVar(&input.From, "from", "", "filter scheduled_at at or after this RFC3339 timestamp")
+	fs.StringVar(&input.To, "to", "", "filter scheduled_at at or before this RFC3339 timestamp")
 	fs.BoolVar(&jsonOutput, "json", false, "print scheduled posts as JSON")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -768,6 +770,7 @@ Examples:
   hermeneia render <run-id>
   hermeneia audit <run-id>
   hermeneia schedule <run-id> --platform instagram --at 2026-05-10T02:00:00Z
+  hermeneia schedules --status scheduled --from 2026-05-10T00:00:00Z --to 2026-05-11T00:00:00Z
   hermeneia cancel-schedule <schedule-id>
   hermeneia serve --addr 127.0.0.1:19318`)
 }
