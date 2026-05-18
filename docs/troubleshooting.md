@@ -207,6 +207,10 @@ Important guardrails:
   selecting `all` for status or platform intentionally omits that query
   parameter. If agenda rows look incomplete, confirm the visible filters before
   checking the database.
+- The Web UI agenda groups the already-filtered response by browser-local
+  calendar day. If a post appears under an unexpected day, compare the stored
+  RFC3339 `scheduled_at` value with the browser timezone instead of assuming the
+  UTC date should be the visible group.
 - Use `hermeneia cancel-schedule <schedule-id>` or
   `PATCH /v1/scheduled-posts/{schedule_id}` with `{"status":"cancelled"}` to
   mark a local schedule record cancelled. Other status writes are rejected in
