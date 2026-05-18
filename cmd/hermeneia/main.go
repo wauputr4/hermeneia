@@ -351,6 +351,9 @@ func (c command) schedule(ctx context.Context, args []string) error {
 
 func (c command) schedules(ctx context.Context, args []string) error {
 	fs := c.flagSet("schedules")
+	var input workflow.ScheduleListInput
+	fs.StringVar(&input.Status, "status", "", "filter by schedule status")
+	fs.StringVar(&input.Platform, "platform", "", "filter by publishing platform")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -358,7 +361,7 @@ func (c command) schedules(ctx context.Context, args []string) error {
 		return fmt.Errorf("schedules does not accept positional arguments")
 	}
 	return c.withService(ctx, func(s *workflow.Service) error {
-		posts, err := s.ListScheduledPosts(ctx)
+		posts, err := s.ListScheduledPostsFiltered(ctx, input)
 		if err != nil {
 			return err
 		}

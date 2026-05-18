@@ -393,6 +393,30 @@ func TestCLIContentRunWorkflow(t *testing.T) {
 	}
 
 	stdout.Reset()
+	if err := cmd.run(ctx, []string{"schedules", "--status", "scheduled"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "instagram") || !strings.Contains(stdout.String(), "linkedin") {
+		t.Fatalf("expected scheduled rows in status-filtered output:\n%s", stdout.String())
+	}
+
+	stdout.Reset()
+	if err := cmd.run(ctx, []string{"schedules", "--platform", "instagram"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "instagram") || strings.Contains(stdout.String(), "linkedin") {
+		t.Fatalf("unexpected platform-filtered schedules output:\n%s", stdout.String())
+	}
+
+	stdout.Reset()
+	if err := cmd.run(ctx, []string{"schedules", "--status", "scheduled", "--platform", "linkedin"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "linkedin") || strings.Contains(stdout.String(), "instagram") {
+		t.Fatalf("unexpected combined-filter schedules output:\n%s", stdout.String())
+	}
+
+	stdout.Reset()
 	if err := cmd.run(ctx, []string{"cancel-schedule", instagramScheduleID}); err != nil {
 		t.Fatal(err)
 	}
@@ -406,6 +430,30 @@ func TestCLIContentRunWorkflow(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "cancelled") {
 		t.Fatalf("expected cancelled status in schedules output:\n%s", stdout.String())
+	}
+
+	stdout.Reset()
+	if err := cmd.run(ctx, []string{"schedules", "--status", "cancelled"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "instagram") || !strings.Contains(stdout.String(), "cancelled") || strings.Contains(stdout.String(), "linkedin") {
+		t.Fatalf("unexpected cancelled-filter schedules output:\n%s", stdout.String())
+	}
+
+	err := cmd.run(ctx, []string{"schedules", "--status", "queued"})
+	if err == nil {
+		t.Fatal("expected invalid status error")
+	}
+	if got := err.Error(); !strings.Contains(got, "unsupported scheduled post status") {
+		t.Fatalf("unexpected invalid status error: %q", got)
+	}
+
+	err = cmd.run(ctx, []string{"schedules", "--platform", "mastodon"})
+	if err == nil {
+		t.Fatal("expected invalid platform error")
+	}
+	if got := err.Error(); !strings.Contains(got, "unsupported publishing platform") {
+		t.Fatalf("unexpected invalid platform error: %q", got)
 	}
 
 	stdout.Reset()
