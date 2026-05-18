@@ -35,6 +35,7 @@
 		latestBrief,
 		runSummary,
 		scheduleAgendaEmptyMessage,
+		scheduleAgendaGroups,
 		scheduleAgendaRows,
 		scheduleArtifactOptions,
 		schedulePostPayload,
@@ -120,6 +121,7 @@
 	const scheduleOptions = $derived(selectedDetails ? scheduleArtifactOptions(selectedDetails.artifacts) : []);
 	const agendaFilters = $derived({ status: agendaStatusFilter, platform: agendaPlatformFilter });
 	const agendaRows = $derived(scheduleAgendaRows(scheduledPosts, runs, agendaFilters));
+	const agendaGroups = $derived(scheduleAgendaGroups(scheduledPosts, runs, agendaFilters));
 	const agendaEmptyMessage = $derived(scheduleAgendaEmptyMessage(agendaFilters));
 	let previousAgendaFilterKey = $state('scheduled:all');
 
@@ -444,42 +446,50 @@
 					<p class="muted">{agendaEmptyMessage}</p>
 				{:else}
 					<div class="agenda-list">
-						{#each agendaRows as post}
-							<article>
-								<div>
-									<strong>{post.topic}</strong>
-									<span>{post.platform} / {post.status}</span>
-								</div>
-								<div class="agenda-actions">
-									<time datetime={post.scheduledAt}>{formatShortDate(post.scheduledAt)}</time>
-									{#if post.cancellable}
-										<button
-											type="button"
-											class="ghost danger"
-											onclick={() => submitCancelSchedule(post.id)}
-											disabled={busy || cancellingScheduleID === post.id}
-										>
-											{cancellingScheduleID === post.id ? 'Cancelling' : 'Cancel'}
-										</button>
-									{/if}
-								</div>
-								<small>{post.runID} / {post.artifactID}</small>
-								{#if post.validation.hasMetadata}
-									<details class:warning={post.validation.warning} class="agenda-validation">
-										<summary>{post.validation.warning ? 'Validation warning' : 'Validation'}</summary>
-										{#if post.validation.warning}
-											<p>{post.validation.warning}</p>
+						{#each agendaGroups as group}
+							<section class="agenda-day" aria-label={group.label}>
+								<header>
+									<strong>{group.label}</strong>
+									<span>{group.count} post{group.count === 1 ? '' : 's'} / first {group.earliestTime}</span>
+								</header>
+								{#each group.rows as post}
+									<article>
+										<div>
+											<strong>{post.topic}</strong>
+											<span>{post.platform} / {post.status}</span>
+										</div>
+										<div class="agenda-actions">
+											<time datetime={post.scheduledAt}>{formatShortDate(post.scheduledAt)}</time>
+											{#if post.cancellable}
+												<button
+													type="button"
+													class="ghost danger"
+													onclick={() => submitCancelSchedule(post.id)}
+													disabled={busy || cancellingScheduleID === post.id}
+												>
+													{cancellingScheduleID === post.id ? 'Cancelling' : 'Cancel'}
+												</button>
+											{/if}
+										</div>
+										<small>{post.runID} / {post.artifactID}</small>
+										{#if post.validation.hasMetadata}
+											<details class:warning={post.validation.warning} class="agenda-validation">
+												<summary>{post.validation.warning ? 'Validation warning' : 'Validation'}</summary>
+												{#if post.validation.warning}
+													<p>{post.validation.warning}</p>
+												{/if}
+												{#if post.validation.details.length > 0}
+													<div>
+														{#each post.validation.details as detail}
+															<span>{detail}</span>
+														{/each}
+													</div>
+												{/if}
+											</details>
 										{/if}
-										{#if post.validation.details.length > 0}
-											<div>
-												{#each post.validation.details as detail}
-													<span>{detail}</span>
-												{/each}
-											</div>
-										{/if}
-									</details>
-								{/if}
-							</article>
+									</article>
+								{/each}
+							</section>
 						{/each}
 					</div>
 				{/if}
@@ -968,6 +978,29 @@
 	.agenda-list {
 		display: grid;
 		gap: 10px;
+	}
+
+	.agenda-day {
+		display: grid;
+		gap: 8px;
+	}
+
+	.agenda-day header {
+		display: grid;
+		gap: 2px;
+		border-bottom: 1px solid rgba(29, 36, 31, 0.45);
+		padding-bottom: 5px;
+	}
+
+	.agenda-day header strong {
+		font-size: 0.82rem;
+		text-transform: uppercase;
+	}
+
+	.agenda-day header span {
+		color: #657166;
+		font-family: 'Courier New', monospace;
+		font-size: 0.7rem;
 	}
 
 	.agenda-filters {

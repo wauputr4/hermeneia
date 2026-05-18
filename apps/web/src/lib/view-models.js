@@ -130,7 +130,7 @@ export function scheduleValidationSummary(validation) {
 
 export function scheduleAgendaRows(posts, runs = [], filters = {}) {
 	const runsByID = new Map((runs ?? []).map((run) => [run.id, run]));
-	return filteredSchedulePosts(posts, filters).sort(compareTimestamp('scheduled_at')).map((post) => {
+	return filteredSchedulePosts(posts, filters).sort(compareScheduledPost).map((post) => {
 		const run = runsByID.get(post.run_id);
 		return {
 			id: post.id,
@@ -144,6 +144,32 @@ export function scheduleAgendaRows(posts, runs = [], filters = {}) {
 			cancellable: post.status === 'scheduled'
 		};
 	});
+}
+
+export function scheduleAgendaGroups(posts, runs = [], filters = {}) {
+	const rows = scheduleAgendaRows(posts, runs, filters);
+	const groups = [];
+	const groupsByDay = new Map();
+
+	for (const row of rows) {
+		const dayKey = scheduleDayKey(row.scheduledAt);
+		let group = groupsByDay.get(dayKey);
+		if (!group) {
+			group = {
+				key: dayKey,
+				label: scheduleDayLabel(row.scheduledAt),
+				count: 0,
+				earliestTime: scheduleTimeLabel(row.scheduledAt),
+				rows: []
+			};
+			groupsByDay.set(dayKey, group);
+			groups.push(group);
+		}
+		group.rows.push(row);
+		group.count = group.rows.length;
+	}
+
+	return groups;
 }
 
 export function defaultScheduleDateTime(now = new Date()) {
@@ -255,6 +281,10 @@ function compareTimestamp(field) {
 	return (a, b) => timestampValue(a?.[field]) - timestampValue(b?.[field]);
 }
 
+function compareScheduledPost(a, b) {
+	return timestampValue(a?.scheduled_at) - timestampValue(b?.scheduled_at) || String(a?.id ?? '').localeCompare(String(b?.id ?? ''));
+}
+
 export function workflowTimeline(details) {
 	if (!details) {
 		return [];
@@ -316,10 +346,47 @@ const shortDateFormatter = new Intl.DateTimeFormat('en', {
 	minute: '2-digit'
 });
 
+const scheduleDayFormatter = new Intl.DateTimeFormat('en', {
+	weekday: 'short',
+	month: 'short',
+	day: '2-digit',
+	year: 'numeric'
+});
+
+const scheduleTimeFormatter = new Intl.DateTimeFormat('en', {
+	hour: '2-digit',
+	minute: '2-digit'
+});
+
 export function formatShortDate(value) {
 	const date = new Date(value);
 	if (Number.isNaN(date.getTime())) {
 		return 'n/a';
 	}
 	return shortDateFormatter.format(date);
+}
+
+function scheduleDayKey(value) {
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) {
+		return 'invalid-date';
+	}
+	const local = new Date(date.getTime() - date.getTimezoneOffset() * 60 * 1000);
+	return local.toISOString().slice(0, 10);
+}
+
+function scheduleDayLabel(value) {
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) {
+		return 'Unscheduled';
+	}
+	return scheduleDayFormatter.format(date);
+}
+
+function scheduleTimeLabel(value) {
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) {
+		return 'n/a';
+	}
+	return scheduleTimeFormatter.format(date);
 }

@@ -95,10 +95,13 @@ The UI sends API query parameters for active agenda filters, such as
 omits that query parameter so the API returns the complete local set for that
 dimension.
 
-It shows upcoming local schedule records ordered by `scheduled_at`, including
-scheduled time, platform, status, run ID/topic when the run list can resolve it,
-artifact ID when present, and compact validation metadata when the API provides
-it. Validation details stay collapsed inside each row so warnings such as a
+It shows upcoming local schedule records grouped by browser-local calendar day
+after the active filters are applied. Each day header shows the row count and
+earliest scheduled time for that day, while rows stay ordered by `scheduled_at`
+with schedule ID as a deterministic fallback. Rows include scheduled time,
+platform, status, run ID/topic when the run list can resolve it, artifact ID
+when present, and compact validation metadata when the API provides it.
+Validation details stay collapsed inside each row so warnings such as a
 missing selected artifact or external-only credential guardrails are available
 without crowding normal agenda scanning. Missing or malformed validation
 metadata is ignored by the view model. Agenda loading errors stay isolated from

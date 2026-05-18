@@ -19,6 +19,7 @@ import {
 	filteredSchedulePosts,
 	scheduleAgendaEmptyMessage,
 	scheduleAgendaFilterOptions,
+	scheduleAgendaGroups,
 	scheduleAgendaRows,
 	scheduleArtifactOptions,
 	schedulePostPayload,
@@ -270,6 +271,47 @@ describe('web view model helpers', () => {
 		assert.equal(
 			scheduleAgendaEmptyMessage({ status: 'cancelled', platform: 'instagram' }),
 			'No cancelled instagram posts match these filters.'
+		);
+	});
+
+	it('groups scheduled-post agenda rows by local calendar day', () => {
+		const groups = scheduleAgendaGroups(
+			[
+				{ id: 'schedule-3', run_id: 'run-1', platform: 'instagram', status: 'scheduled', scheduled_at: '2026-05-19T08:00:00Z' },
+				{ id: 'schedule-2', run_id: 'run-1', platform: 'instagram', status: 'scheduled', scheduled_at: '2026-05-18T11:00:00Z' },
+				{ id: 'schedule-1', run_id: 'run-1', platform: 'instagram', status: 'scheduled', scheduled_at: '2026-05-18T09:00:00Z' }
+			],
+			[{ id: 'run-1', topic: 'AI launch' }],
+			{ status: 'scheduled', platform: 'all' }
+		);
+
+		assert.deepEqual(groups.map((group) => [group.key, group.count, group.rows.map((row) => row.id)]), [
+			['2026-05-18', 2, ['schedule-1', 'schedule-2']],
+			['2026-05-19', 1, ['schedule-3']]
+		]);
+		assert.match(groups[0].label, /May 18, 2026/);
+		assert.notEqual(groups[0].earliestTime, 'n/a');
+	});
+
+	it('keeps same-time scheduled-post agenda ordering deterministic', () => {
+		assert.deepEqual(
+			scheduleAgendaRows([
+				{ id: 'schedule-b', run_id: 'run-1', status: 'scheduled', scheduled_at: '2026-05-18T09:00:00Z' },
+				{ id: 'schedule-a', run_id: 'run-1', status: 'scheduled', scheduled_at: '2026-05-18T09:00:00Z' }
+			]).map((row) => row.id),
+			['schedule-a', 'schedule-b']
+		);
+	});
+
+	it('returns no scheduled-post agenda groups for empty or filtered-out rows', () => {
+		assert.deepEqual(scheduleAgendaGroups([], [], { status: 'scheduled', platform: 'all' }), []);
+		assert.deepEqual(
+			scheduleAgendaGroups(
+				[{ id: 'schedule-1', platform: 'linkedin', status: 'cancelled', scheduled_at: '2026-05-18T09:00:00Z' }],
+				[],
+				{ status: 'scheduled', platform: 'linkedin' }
+			),
+			[]
 		);
 	});
 
