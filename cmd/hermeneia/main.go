@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -352,8 +353,10 @@ func (c command) schedule(ctx context.Context, args []string) error {
 func (c command) schedules(ctx context.Context, args []string) error {
 	fs := c.flagSet("schedules")
 	var input workflow.ScheduleListInput
+	var jsonOutput bool
 	fs.StringVar(&input.Status, "status", "", "filter by schedule status")
 	fs.StringVar(&input.Platform, "platform", "", "filter by publishing platform")
+	fs.BoolVar(&jsonOutput, "json", false, "print scheduled posts as JSON")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -364,6 +367,11 @@ func (c command) schedules(ctx context.Context, args []string) error {
 		posts, err := s.ListScheduledPostsFiltered(ctx, input)
 		if err != nil {
 			return err
+		}
+		if jsonOutput {
+			encoder := json.NewEncoder(c.stdout)
+			encoder.SetIndent("", "  ")
+			return encoder.Encode(scheduleJSONRows(posts))
 		}
 		if len(posts) == 0 {
 			fmt.Fprintln(c.stdout, "no scheduled posts found")
@@ -376,6 +384,34 @@ func (c command) schedules(ctx context.Context, args []string) error {
 		}
 		return w.Flush()
 	})
+}
+
+type scheduleJSONRow struct {
+	ID          string    `json:"id"`
+	RunID       string    `json:"run_id"`
+	ArtifactID  string    `json:"artifact_id"`
+	Platform    string    `json:"platform"`
+	Status      string    `json:"status"`
+	ScheduledAt time.Time `json:"scheduled_at"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+func scheduleJSONRows(posts []storage.ScheduledPost) []scheduleJSONRow {
+	rows := make([]scheduleJSONRow, 0, len(posts))
+	for _, post := range posts {
+		rows = append(rows, scheduleJSONRow{
+			ID:          post.ID,
+			RunID:       post.RunID,
+			ArtifactID:  post.ArtifactID,
+			Platform:    post.Platform,
+			Status:      post.Status,
+			ScheduledAt: post.ScheduledAt,
+			CreatedAt:   post.CreatedAt,
+			UpdatedAt:   post.UpdatedAt,
+		})
+	}
+	return rows
 }
 
 func (c command) cancelSchedule(ctx context.Context, args []string) error {

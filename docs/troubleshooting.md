@@ -224,6 +224,10 @@ Important guardrails:
   filters using the same validation as the API. Invalid statuses or unsupported
   platforms return a clear non-zero error; omit either flag to leave that
   dimension unfiltered.
+- Add `--json` to `hermeneia schedules` when automation needs structured rows
+  instead of the human table. Filter validation still happens before JSON is
+  printed, so invalid `--status` or `--platform` values should fail with no
+  partial JSON output.
 
 ## 2026-05-10 — Template manifest loader
 
