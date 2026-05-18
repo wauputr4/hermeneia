@@ -202,11 +202,14 @@ outside the Hermeneia database.
 hermeneia schedule <run-id> --platform instagram --at 2026-05-10T02:00:00Z
 hermeneia cancel-schedule <schedule-id>
 hermeneia schedules
+hermeneia schedules --status scheduled --platform instagram
 ```
 
 Schedule cancellation is a local SQLite metadata update only. It marks a
 scheduled post `cancelled` when plans change, but it does not call Meta,
 YouTube, TikTok, LinkedIn, or any other external publishing platform.
+Use optional `--status` and `--platform` filters with `hermeneia schedules` for
+focused local inspection. Omitting a flag leaves that dimension unfiltered.
 
 Supported planned platforms:
 

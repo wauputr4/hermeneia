@@ -216,6 +216,10 @@ Important guardrails:
   should remain visible without a repeated cancel action. Agenda cancellation
   errors are shown in the agenda panel and should not clear the selected run
   review state.
+- The CLI `hermeneia schedules` command accepts `--status` and `--platform`
+  filters using the same validation as the API. Invalid statuses or unsupported
+  platforms return a clear non-zero error; omit either flag to leave that
+  dimension unfiltered.
 
 ## 2026-05-10 — Template manifest loader
 

@@ -112,6 +112,7 @@ go run ./cmd/hermeneia render <run-id>
 go run ./cmd/hermeneia audit <run-id>
 go run ./cmd/hermeneia schedule <run-id> --platform instagram --at 2026-05-10T02:00:00Z
 go run ./cmd/hermeneia schedules
+go run ./cmd/hermeneia schedules --status scheduled --platform instagram
 go run ./cmd/hermeneia show <run-id>
 ```
 
@@ -162,7 +163,7 @@ Current CLI surface:
 - `hermeneia render` writes `content.json`, generates output assets, and stores artifact references.
 - `hermeneia audit` checks a run's artifact rows against files, checksums, safe paths, and untracked output files.
 - `hermeneia schedule` records a future publishing slot with platform validation and no stored platform credentials.
-- `hermeneia schedules` lists scheduled publishing records and their statuses.
+- `hermeneia schedules` lists scheduled publishing records and their statuses, with optional `--status` and `--platform` filters.
 
 Default MVP templates:
 
