@@ -36,6 +36,7 @@
 		runSummary,
 		scheduleAgendaEmptyMessage,
 		scheduleAgendaGroups,
+		scheduleAgendaQueryFilters,
 		scheduleAgendaRows,
 		scheduleArtifactOptions,
 		schedulePostPayload,
@@ -70,6 +71,8 @@
 	let cancellingScheduleID = $state('');
 	let agendaStatusFilter = $state('scheduled');
 	let agendaPlatformFilter = $state('all');
+	let agendaFromFilter = $state('');
+	let agendaToFilter = $state('');
 	let revisionInstruction = $state('');
 	let artifactKindFilter = $state('all');
 	let artifactAudit = $state<ArtifactAuditResult | null>(null);
@@ -119,14 +122,19 @@
 	const selectedRunTimeline = $derived(workflowTimeline(selectedDetails));
 	const artifactAuditRows = $derived(auditIssueRows(artifactAudit));
 	const scheduleOptions = $derived(selectedDetails ? scheduleArtifactOptions(selectedDetails.artifacts) : []);
-	const agendaFilters = $derived({ status: agendaStatusFilter, platform: agendaPlatformFilter });
+	const agendaFilters = $derived({
+		status: agendaStatusFilter,
+		platform: agendaPlatformFilter,
+		from: agendaFromFilter,
+		to: agendaToFilter
+	});
 	const agendaRows = $derived(scheduleAgendaRows(scheduledPosts, runs, agendaFilters));
 	const agendaGroups = $derived(scheduleAgendaGroups(scheduledPosts, runs, agendaFilters));
 	const agendaEmptyMessage = $derived(scheduleAgendaEmptyMessage(agendaFilters));
-	let previousAgendaFilterKey = $state('scheduled:all');
+	let previousAgendaFilterKey = $state('scheduled:all::');
 
 	$effect(() => {
-		const key = `${agendaStatusFilter}:${agendaPlatformFilter}`;
+		const key = `${agendaStatusFilter}:${agendaPlatformFilter}:${agendaFromFilter}:${agendaToFilter}`;
 		if (key === previousAgendaFilterKey) return;
 		previousAgendaFilterKey = key;
 		loadScheduleAgenda();
@@ -191,8 +199,14 @@
 	async function loadScheduleAgenda() {
 		loadingScheduleAgenda = true;
 		scheduleAgendaError = '';
+		const query = scheduleAgendaQueryFilters(agendaFilters);
+		if (query.error) {
+			scheduleAgendaError = query.error;
+			loadingScheduleAgenda = false;
+			return;
+		}
 		try {
-			scheduledPosts = await listScheduledPosts(agendaFilters);
+			scheduledPosts = await listScheduledPosts(query.filters);
 		} catch (err) {
 			scheduledPosts = [];
 			scheduleAgendaError = err instanceof Error ? err.message : 'Unable to load scheduled posts';
@@ -359,6 +373,11 @@
 			scheduleForm.scheduled_at = defaultScheduleDateTime();
 		}
 	}
+
+	function clearAgendaRange() {
+		agendaFromFilter = '';
+		agendaToFilter = '';
+	}
 </script>
 
 <svelte:head>
@@ -437,6 +456,15 @@
 							{/each}
 						</select>
 					</label>
+					<label>
+						From
+						<input type="datetime-local" bind:value={agendaFromFilter} />
+					</label>
+					<label>
+						To
+						<input type="datetime-local" bind:value={agendaToFilter} />
+					</label>
+					<button type="button" class="ghost" onclick={clearAgendaRange} disabled={!agendaFromFilter && !agendaToFilter}>Clear range</button>
 				</div>
 				{#if scheduleAgendaError}
 					<p class="field-note error-text">{scheduleAgendaError}</p>
@@ -1017,9 +1045,15 @@
 		text-transform: uppercase;
 	}
 
-	.agenda-filters select {
+	.agenda-filters select,
+	.agenda-filters input {
 		min-width: 0;
 		padding: 7px 8px;
+	}
+
+	.agenda-filters button {
+		align-self: end;
+		min-height: 34px;
 	}
 
 	.agenda-list article {

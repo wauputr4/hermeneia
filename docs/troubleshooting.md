@@ -208,6 +208,10 @@ Important guardrails:
   selecting `all` for status or platform intentionally omits that query
   parameter. If agenda rows look incomplete, confirm the visible filters before
   checking the database.
+- The Web UI agenda range controls convert browser-local `datetime-local`
+  values to RFC3339 `from` and `to` API filters before refreshing. Invalid
+  values or a start time later than the end time are rejected in the browser, so
+  clear or correct the range before checking API logs.
 - The Web UI agenda groups the already-filtered response by browser-local
   calendar day. If a post appears under an unexpected day, compare the stored
   RFC3339 `scheduled_at` value with the browser timezone instead of assuming the

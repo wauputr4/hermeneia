@@ -91,9 +91,11 @@ GET /v1/scheduled-posts
 
 The UI sends API query parameters for active agenda filters, such as
 `GET /v1/scheduled-posts?status=scheduled` by default and adding
-`platform={platform}` when a specific platform is selected. Choosing `all`
-omits that query parameter so the API returns the complete local set for that
-dimension.
+`platform={platform}` when a specific platform is selected. The optional
+browser-local date/time range controls are converted to RFC3339 `from` and
+`to` query parameters before refreshing the agenda. Choosing `all` or clearing
+the range omits that query parameter so the API returns the complete local set
+for that dimension.
 
 It shows upcoming local schedule records grouped by browser-local calendar day
 after the active filters are applied. Each day header shows the row count and
