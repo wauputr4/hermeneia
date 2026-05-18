@@ -228,7 +228,9 @@ Important guardrails:
 - Add `--json` to `hermeneia schedules` when automation needs structured rows
   instead of the human table. Filter validation still happens before JSON is
   printed, so invalid `--status` or `--platform` values should fail with no
-  partial JSON output.
+  partial JSON output. Each JSON row includes a `validation` object; rows
+  without stored validation metadata return `{}` so scripts can read the field
+  consistently.
 
 ## 2026-05-10 — Template manifest loader
 

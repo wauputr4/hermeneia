@@ -431,6 +431,9 @@ func TestCLIContentRunWorkflow(t *testing.T) {
 	if allScheduleRows[0].ID == "" || allScheduleRows[0].RunID != "run-cli" || allScheduleRows[0].ScheduledAt.IsZero() || allScheduleRows[0].CreatedAt.IsZero() || allScheduleRows[0].UpdatedAt.IsZero() {
 		t.Fatalf("JSON schedule row missing stable fields: %#v", allScheduleRows[0])
 	}
+	if allScheduleRows[0].Validation["credentials_stored_in_db"] != false || allScheduleRows[0].Validation["credential_storage"] != "external_only" {
+		t.Fatalf("JSON schedule row missing validation metadata: %#v", allScheduleRows[0])
+	}
 
 	stdout.Reset()
 	if err := cmd.run(ctx, []string{"schedules", "--status", "scheduled", "--platform", "instagram", "--json"}); err != nil {
@@ -442,6 +445,9 @@ func TestCLIContentRunWorkflow(t *testing.T) {
 	}
 	if len(filteredScheduleRows) != 1 || filteredScheduleRows[0].Platform != "instagram" || filteredScheduleRows[0].Status != "scheduled" {
 		t.Fatalf("unexpected filtered JSON schedule rows: %#v", filteredScheduleRows)
+	}
+	if filteredScheduleRows[0].Validation["requires_platform_connector"] != true {
+		t.Fatalf("filtered JSON schedule row missing validation metadata: %#v", filteredScheduleRows[0])
 	}
 
 	stdout.Reset()
@@ -499,6 +505,15 @@ func TestCLIContentRunWorkflow(t *testing.T) {
 	for _, want := range []string{"run:", "run-cli", "brief_versions:", "2", "artifacts:"} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("show output missing %q:\n%s", want, stdout.String())
+		}
+	}
+}
+
+func TestScheduleValidationObjectEmptyFallback(t *testing.T) {
+	for _, value := range []string{"", "  ", "null", "[]", "{malformed"} {
+		validation := scheduleValidationObject(value)
+		if len(validation) != 0 {
+			t.Fatalf("expected empty validation fallback for %q, got %#v", value, validation)
 		}
 	}
 }

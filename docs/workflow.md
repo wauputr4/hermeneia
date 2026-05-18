@@ -212,7 +212,7 @@ YouTube, TikTok, LinkedIn, or any other external publishing platform.
 Use optional `--status` and `--platform` filters with `hermeneia schedules` for
 focused local inspection. Omitting a flag leaves that dimension unfiltered. Add
 `--json` to print the same filtered rows as structured JSON with stable schedule
-fields for scripts and agent workflows.
+fields and validation metadata for scripts and agent workflows.
 
 Supported planned platforms:
 

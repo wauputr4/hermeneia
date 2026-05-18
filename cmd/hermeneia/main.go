@@ -387,14 +387,15 @@ func (c command) schedules(ctx context.Context, args []string) error {
 }
 
 type scheduleJSONRow struct {
-	ID          string    `json:"id"`
-	RunID       string    `json:"run_id"`
-	ArtifactID  string    `json:"artifact_id"`
-	Platform    string    `json:"platform"`
-	Status      string    `json:"status"`
-	ScheduledAt time.Time `json:"scheduled_at"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          string         `json:"id"`
+	RunID       string         `json:"run_id"`
+	ArtifactID  string         `json:"artifact_id"`
+	Platform    string         `json:"platform"`
+	Status      string         `json:"status"`
+	ScheduledAt time.Time      `json:"scheduled_at"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	Validation  map[string]any `json:"validation"`
 }
 
 func scheduleJSONRows(posts []storage.ScheduledPost) []scheduleJSONRow {
@@ -409,9 +410,21 @@ func scheduleJSONRows(posts []storage.ScheduledPost) []scheduleJSONRow {
 			ScheduledAt: post.ScheduledAt,
 			CreatedAt:   post.CreatedAt,
 			UpdatedAt:   post.UpdatedAt,
+			Validation:  scheduleValidationObject(post.ValidationJSON),
 		})
 	}
 	return rows
+}
+
+func scheduleValidationObject(value string) map[string]any {
+	if strings.TrimSpace(value) == "" {
+		return map[string]any{}
+	}
+	var validation map[string]any
+	if err := json.Unmarshal([]byte(value), &validation); err != nil || validation == nil {
+		return map[string]any{}
+	}
+	return validation
 }
 
 func (c command) cancelSchedule(ctx context.Context, args []string) error {
