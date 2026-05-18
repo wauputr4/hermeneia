@@ -418,6 +418,14 @@ func TestCLIContentRunWorkflow(t *testing.T) {
 	}
 
 	stdout.Reset()
+	if err := cmd.run(ctx, []string{"schedules", "--from", "2026-05-10T03:00:00Z", "--to", "2026-05-10T03:00:00Z"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "linkedin") || strings.Contains(stdout.String(), "instagram") {
+		t.Fatalf("unexpected range-filtered schedules output:\n%s", stdout.String())
+	}
+
+	stdout.Reset()
 	if err := cmd.run(ctx, []string{"schedules", "--json"}); err != nil {
 		t.Fatal(err)
 	}
@@ -448,6 +456,18 @@ func TestCLIContentRunWorkflow(t *testing.T) {
 	}
 	if filteredScheduleRows[0].Validation["requires_platform_connector"] != true {
 		t.Fatalf("filtered JSON schedule row missing validation metadata: %#v", filteredScheduleRows[0])
+	}
+
+	stdout.Reset()
+	if err := cmd.run(ctx, []string{"schedules", "--status", "scheduled", "--platform", "linkedin", "--from", "2026-05-10T02:00:00Z", "--to", "2026-05-10T03:00:00Z", "--json"}); err != nil {
+		t.Fatal(err)
+	}
+	var rangeFilteredScheduleRows []scheduleJSONRow
+	if err := json.Unmarshal(stdout.Bytes(), &rangeFilteredScheduleRows); err != nil {
+		t.Fatalf("range-filtered schedules --json did not print valid JSON: %v\n%s", err, stdout.String())
+	}
+	if len(rangeFilteredScheduleRows) != 1 || rangeFilteredScheduleRows[0].Platform != "linkedin" || !rangeFilteredScheduleRows[0].ScheduledAt.Equal(time.Date(2026, 5, 10, 3, 0, 0, 0, time.UTC)) {
+		t.Fatalf("unexpected range-filtered JSON schedule rows: %#v", rangeFilteredScheduleRows)
 	}
 
 	stdout.Reset()
@@ -496,6 +516,30 @@ func TestCLIContentRunWorkflow(t *testing.T) {
 	}
 	if stdout.String() != "" {
 		t.Fatalf("invalid platform printed output before failing: %q", stdout.String())
+	}
+
+	stdout.Reset()
+	err = cmd.run(ctx, []string{"schedules", "--from", "tomorrow"})
+	if err == nil {
+		t.Fatal("expected invalid from error")
+	}
+	if got := err.Error(); !strings.Contains(got, "from must be a valid RFC3339 timestamp") {
+		t.Fatalf("unexpected invalid from error: %q", got)
+	}
+	if stdout.String() != "" {
+		t.Fatalf("invalid from printed output before failing: %q", stdout.String())
+	}
+
+	stdout.Reset()
+	err = cmd.run(ctx, []string{"schedules", "--from", "2026-05-10T04:00:00Z", "--to", "2026-05-10T03:00:00Z"})
+	if err == nil {
+		t.Fatal("expected inverted range error")
+	}
+	if got := err.Error(); !strings.Contains(got, "from must be before or equal to to") {
+		t.Fatalf("unexpected inverted range error: %q", got)
+	}
+	if stdout.String() != "" {
+		t.Fatalf("inverted range printed output before failing: %q", stdout.String())
 	}
 
 	stdout.Reset()
