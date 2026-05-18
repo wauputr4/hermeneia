@@ -1,4 +1,5 @@
 import { env } from '$env/dynamic/public';
+import { scheduledPostsPath } from './api-paths.js';
 
 const DEFAULT_API_BASE = 'http://127.0.0.1:19318';
 
@@ -143,6 +144,11 @@ export type SchedulePostInput = {
 	scheduled_at: string;
 };
 
+export type ScheduledPostFilters = {
+	status?: string;
+	platform?: string;
+};
+
 function apiBase(): string {
 	return (env.PUBLIC_HERMENEIA_API_BASE || DEFAULT_API_BASE).replace(/\/$/, '');
 }
@@ -192,8 +198,8 @@ export async function listWorkflows(): Promise<WorkflowPreset[]> {
 	return response.workflows;
 }
 
-export async function listScheduledPosts(): Promise<ScheduledPost[]> {
-	const response = await request<{ scheduled_posts: ScheduledPost[] }>('/v1/scheduled-posts');
+export async function listScheduledPosts(filters: ScheduledPostFilters = {}): Promise<ScheduledPost[]> {
+	const response = await request<{ scheduled_posts: ScheduledPost[] }>(scheduledPostsPath(filters));
 	return response.scheduled_posts;
 }
 
