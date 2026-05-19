@@ -146,6 +146,12 @@ Image and video artifacts render inline previews. Text and JSON artifacts keep a
 compact metadata row with filename, path, timestamp, checksum status, and direct
 links.
 
+Artifact cards also summarize local schedule usage from the selected run detail
+payload. A card shows when its artifact ID appears on one or more schedule
+records, including counts by status and either the next future scheduled time or
+the latest schedule time. Schedule rows without an artifact ID are ignored so
+artifact-less records do not attach to unrelated files.
+
 The run detail view also calls the read-only artifact audit endpoint on demand:
 
 ```text

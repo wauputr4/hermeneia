@@ -215,6 +215,11 @@ Important guardrails:
   research artifacts. If the selected run changes and the previous artifact is
   not available there, the UI resets the agenda artifact filter to all artifacts
   before refreshing.
+- Web UI artifact cards derive their schedule badges from the selected run
+  detail payload. If a rendered artifact shows `No local schedules`, compare
+  its artifact ID with the run's `scheduled_posts` rows before adding a new API
+  request. Schedule rows with an empty `artifact_id` are intentionally ignored
+  for per-artifact badges.
 - The Web UI agenda range controls convert browser-local `datetime-local`
   values to RFC3339 `from` and `to` API filters before refreshing. Invalid
   values or a start time later than the end time are rejected in the browser, so

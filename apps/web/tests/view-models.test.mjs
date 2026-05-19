@@ -8,6 +8,8 @@ import {
 	artifactKindLabel,
 	artifactKindOptions,
 	artifactPreviewType,
+	artifactScheduleSummaries,
+	artifactScheduleSummary,
 	artifactsForKind,
 	auditIssueRows,
 	auditStatusLabel,
@@ -85,6 +87,58 @@ describe('web view model helpers', () => {
 		assert.equal(artifactKindLabel('content_json'), 'content json');
 		assert.equal(artifactDisplayName(artifacts[1]), 'slide-01.png');
 		assert.equal(artifactDisplayName({ id: 'artifact-4', kind: 'content_json' }), 'artifact-4');
+	});
+
+	it('derives artifact schedule summaries without attaching missing artifact rows', () => {
+		const summaries = artifactScheduleSummaries(
+			[
+				{ id: 'artifact-1' },
+				{ id: 'artifact-2' }
+			],
+			[
+				{ id: 'schedule-1', artifact_id: 'artifact-1', status: 'scheduled', scheduled_at: '2026-05-18T09:00:00Z' },
+				{ id: 'schedule-2', artifact_id: 'artifact-1', status: 'cancelled', scheduled_at: '2026-05-17T09:00:00Z' },
+				{ id: 'schedule-3', artifact_id: '', status: 'scheduled', scheduled_at: '2026-05-18T10:00:00Z' }
+			],
+			new Date('2026-05-18T08:00:00Z')
+		);
+
+		assert.deepEqual(summaries.get('artifact-1'), {
+			hasSchedules: true,
+			count: 2,
+			statusLabel: '1 cancelled, 1 scheduled',
+			timeLabel: 'Next May 18, 09:00 AM',
+			nextScheduledAt: '2026-05-18T09:00:00Z',
+			latestScheduledAt: '2026-05-18T09:00:00Z'
+		});
+		assert.deepEqual(summaries.get('artifact-2'), {
+			hasSchedules: false,
+			count: 0,
+			statusLabel: 'No local schedules',
+			timeLabel: '',
+			nextScheduledAt: '',
+			latestScheduledAt: ''
+		});
+	});
+
+	it('falls back to latest artifact schedule time when no future scheduled row exists', () => {
+		assert.deepEqual(
+			artifactScheduleSummary(
+				[
+					{ id: 'schedule-1', artifact_id: 'artifact-1', status: 'published', scheduled_at: '2026-05-17T09:00:00Z' },
+					{ id: 'schedule-2', artifact_id: 'artifact-1', status: 'cancelled', scheduled_at: '2026-05-18T09:00:00Z' }
+				],
+				new Date('2026-05-19T08:00:00Z')
+			),
+			{
+				hasSchedules: true,
+				count: 2,
+				statusLabel: '1 cancelled, 1 published',
+				timeLabel: 'Latest May 18, 09:00 AM',
+				nextScheduledAt: '',
+				latestScheduledAt: '2026-05-18T09:00:00Z'
+			}
+		);
 	});
 
 	it('formats artifact audit status and issue rows', () => {
