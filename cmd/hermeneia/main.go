@@ -380,12 +380,19 @@ func (c command) schedules(ctx context.Context, args []string) error {
 			return nil
 		}
 		w := tabwriter.NewWriter(c.stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "SCHEDULE ID\tRUN ID\tPLATFORM\tSTATUS\tSCHEDULED AT")
+		fmt.Fprintln(w, "SCHEDULE ID\tRUN ID\tARTIFACT ID\tPLATFORM\tSTATUS\tSCHEDULED AT")
 		for _, post := range posts {
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", post.ID, post.RunID, post.Platform, post.Status, post.ScheduledAt.Format(time.RFC3339))
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", post.ID, post.RunID, scheduleArtifactIDDisplay(post.ArtifactID), post.Platform, post.Status, post.ScheduledAt.Format(time.RFC3339))
 		}
 		return w.Flush()
 	})
+}
+
+func scheduleArtifactIDDisplay(artifactID string) string {
+	if strings.TrimSpace(artifactID) == "" {
+		return "none"
+	}
+	return artifactID
 }
 
 type scheduleJSONRow struct {
