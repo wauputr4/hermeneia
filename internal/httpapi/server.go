@@ -331,6 +331,7 @@ func (s *Server) handleSchedulePost(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleListScheduledPosts(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	posts, err := s.service.ListScheduledPostsFiltered(r.Context(), workflow.ScheduleListInput{
+		RunID:    query.Get("run_id"),
 		Status:   query.Get("status"),
 		Platform: query.Get("platform"),
 		From:     query.Get("from"),
