@@ -286,6 +286,27 @@ describe('web view model helpers', () => {
 		);
 	});
 
+	it('filters scheduled-post agenda rows by artifact id', () => {
+		const posts = [
+			{ id: 'schedule-1', run_id: 'run-1', artifact_id: 'artifact-1', platform: 'instagram', status: 'scheduled', scheduled_at: '2026-05-18T09:00:00Z' },
+			{ id: 'schedule-2', run_id: 'run-1', artifact_id: 'artifact-2', platform: 'instagram', status: 'scheduled', scheduled_at: '2026-05-18T10:00:00Z' },
+			{ id: 'schedule-3', run_id: 'run-2', artifact_id: 'artifact-1', platform: 'linkedin', status: 'cancelled', scheduled_at: '2026-05-18T11:00:00Z' }
+		];
+
+		assert.deepEqual(
+			filteredSchedulePosts(posts, { artifactID: 'artifact-1', status: 'scheduled', platform: 'all' }).map((post) => post.id),
+			['schedule-1']
+		);
+		assert.deepEqual(
+			scheduleAgendaRows(posts, [], { artifactID: 'missing-artifact', status: 'all', platform: 'all' }),
+			[]
+		);
+		assert.equal(
+			scheduleAgendaEmptyMessage({ artifactID: 'missing-artifact', status: 'all', platform: 'all' }),
+			'No scheduled posts for this artifact match these filters.'
+		);
+	});
+
 	it('filters scheduled-post agenda rows by inclusive date range', () => {
 		const posts = [
 			{ id: 'schedule-1', run_id: 'run-1', platform: 'instagram', status: 'scheduled', scheduled_at: '2026-05-18T09:00:00Z' },
@@ -353,6 +374,7 @@ describe('web view model helpers', () => {
 		assert.equal(scheduledPostsPath(), '/v1/scheduled-posts');
 		assert.equal(scheduledPostsPath({ run_id: 'all', status: 'all', platform: 'all' }), '/v1/scheduled-posts');
 		assert.equal(scheduledPostsPath({ run_id: 'run-1', status: 'all', platform: 'all' }), '/v1/scheduled-posts?run_id=run-1');
+		assert.equal(scheduledPostsPath({ artifact_id: 'artifact-1', status: 'all', platform: 'all' }), '/v1/scheduled-posts?artifact_id=artifact-1');
 		assert.equal(scheduledPostsPath({ status: 'scheduled', platform: 'all' }), '/v1/scheduled-posts?status=scheduled');
 		assert.equal(scheduledPostsPath({ status: 'all', platform: 'instagram' }), '/v1/scheduled-posts?platform=instagram');
 		assert.equal(
@@ -362,12 +384,13 @@ describe('web view model helpers', () => {
 		assert.equal(
 			scheduledPostsPath({
 				run_id: 'run-1',
+				artifact_id: 'artifact-1',
 				status: 'scheduled',
 				platform: 'instagram',
 				from: '2026-05-18T09:00:00.000Z',
 				to: '2026-05-19T09:00:00.000Z'
 			}),
-			'/v1/scheduled-posts?run_id=run-1&status=scheduled&platform=instagram&from=2026-05-18T09%3A00%3A00.000Z&to=2026-05-19T09%3A00%3A00.000Z'
+			'/v1/scheduled-posts?run_id=run-1&artifact_id=artifact-1&status=scheduled&platform=instagram&from=2026-05-18T09%3A00%3A00.000Z&to=2026-05-19T09%3A00%3A00.000Z'
 		);
 	});
 
@@ -381,12 +404,14 @@ describe('web view model helpers', () => {
 				status: 'scheduled',
 				platform: 'linkedin',
 				runID: 'run-1',
+				artifactID: 'artifact-1',
 				from: '2026-05-18T09:00',
 				to: '2026-05-18T10:00'
 			}),
 			{
 				filters: {
 					run_id: 'run-1',
+					artifact_id: 'artifact-1',
 					status: 'scheduled',
 					platform: 'linkedin',
 					from: '2026-05-18T09:00:00.000Z',

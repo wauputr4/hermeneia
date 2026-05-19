@@ -80,31 +80,38 @@ export function scheduleAgendaFilterOptions(posts, field) {
 
 export function filteredSchedulePosts(posts, filters = {}) {
 	const runID = filters.runID ?? filters.run_id ?? 'all';
+	const artifactID = filters.artifactID ?? filters.artifact_id ?? 'all';
 	const status = filters.status ?? 'all';
 	const platform = filters.platform ?? 'all';
 	const from = timestampFilterValue(filters.from);
 	const to = timestampFilterValue(filters.to);
 	return (posts ?? []).filter((post) => {
 		const matchesRun = runID === 'all' || post.run_id === runID;
+		const matchesArtifact = artifactID === 'all' || post.artifact_id === artifactID;
 		const matchesStatus = status === 'all' || post.status === status;
 		const matchesPlatform = platform === 'all' || post.platform === platform;
 		const scheduledAt = timestampValue(post?.scheduled_at);
 		const matchesFrom = from === null || scheduledAt >= from;
 		const matchesTo = to === null || scheduledAt <= to;
-		return matchesRun && matchesStatus && matchesPlatform && matchesFrom && matchesTo;
+		return matchesRun && matchesArtifact && matchesStatus && matchesPlatform && matchesFrom && matchesTo;
 	});
 }
 
 export function scheduleAgendaEmptyMessage(filters = {}, runs = []) {
 	const runID = filters.runID ?? filters.run_id ?? 'all';
+	const artifactID = filters.artifactID ?? filters.artifact_id ?? 'all';
 	const status = filters.status ?? 'all';
 	const platform = filters.platform ?? 'all';
 	const hasRange = Boolean(filters.from || filters.to);
 	const hasRun = runID !== 'all';
+	const hasArtifact = artifactID !== 'all';
 	if (hasRun) {
 		const run = (runs ?? []).find((candidate) => candidate.id === runID);
 		const runLabel = run?.topic || runID;
 		return `No scheduled posts for ${runLabel} match these filters.`;
+	}
+	if (hasArtifact) {
+		return 'No scheduled posts for this artifact match these filters.';
 	}
 	if (status === 'all' && platform === 'all' && !hasRange) {
 		return 'No local scheduled posts yet.';
@@ -126,6 +133,10 @@ export function scheduleAgendaQueryFilters(filters = {}) {
 	const runID = filters.runID ?? filters.run_id;
 	if (runID && runID !== 'all') {
 		queryFilters.run_id = runID;
+	}
+	const artifactID = filters.artifactID ?? filters.artifact_id;
+	if (artifactID && artifactID !== 'all') {
+		queryFilters.artifact_id = artifactID;
 	}
 	if (filters.status && filters.status !== 'all') {
 		queryFilters.status = filters.status;
