@@ -1,5 +1,8 @@
 export function scheduledPostsPath(filters = {}) {
 	const params = new URLSearchParams();
+	if (filters.run_id && filters.run_id !== 'all') {
+		params.set('run_id', filters.run_id);
+	}
 	if (filters.status && filters.status !== 'all') {
 		params.set('status', filters.status);
 	}

@@ -204,9 +204,9 @@ Important guardrails:
   render without a validation section. Use the validation details to confirm
   that schedule records are local-only and that platform credentials remain
   outside SQLite.
-- The Web UI agenda sends the active status/platform filters to
+- The Web UI agenda sends the active run/status/platform filters to
   `GET /v1/scheduled-posts`. The default request includes `status=scheduled`;
-  selecting `all` for status or platform intentionally omits that query
+  selecting `all` for run, status, or platform intentionally omits that query
   parameter. If agenda rows look incomplete, confirm the visible filters before
   checking the database.
 - The Web UI agenda range controls convert browser-local `datetime-local`

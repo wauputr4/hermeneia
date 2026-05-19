@@ -69,6 +69,7 @@
 	let scheduleAgendaError = $state('');
 	let notice = $state('');
 	let cancellingScheduleID = $state('');
+	let agendaRunFilter = $state('all');
 	let agendaStatusFilter = $state('scheduled');
 	let agendaPlatformFilter = $state('all');
 	let agendaFromFilter = $state('');
@@ -123,6 +124,7 @@
 	const artifactAuditRows = $derived(auditIssueRows(artifactAudit));
 	const scheduleOptions = $derived(selectedDetails ? scheduleArtifactOptions(selectedDetails.artifacts) : []);
 	const agendaFilters = $derived({
+		runID: agendaRunFilter,
 		status: agendaStatusFilter,
 		platform: agendaPlatformFilter,
 		from: agendaFromFilter,
@@ -130,11 +132,11 @@
 	});
 	const agendaRows = $derived(scheduleAgendaRows(scheduledPosts, runs, agendaFilters));
 	const agendaGroups = $derived(scheduleAgendaGroups(scheduledPosts, runs, agendaFilters));
-	const agendaEmptyMessage = $derived(scheduleAgendaEmptyMessage(agendaFilters));
-	let previousAgendaFilterKey = $state('scheduled:all::');
+	const agendaEmptyMessage = $derived(scheduleAgendaEmptyMessage(agendaFilters, runs));
+	let previousAgendaFilterKey = $state('all:scheduled:all::');
 
 	$effect(() => {
-		const key = `${agendaStatusFilter}:${agendaPlatformFilter}:${agendaFromFilter}:${agendaToFilter}`;
+		const key = `${agendaRunFilter}:${agendaStatusFilter}:${agendaPlatformFilter}:${agendaFromFilter}:${agendaToFilter}`;
 		if (key === previousAgendaFilterKey) return;
 		previousAgendaFilterKey = key;
 		loadScheduleAgenda();
@@ -188,12 +190,15 @@
 			await loadScheduleAgenda();
 			if (runs.length > 0) {
 				await selectRun(runs[0].id);
+				}
+			} catch (err) {
+				error = err instanceof Error ? err.message : 'Unable to load runs';
+			} finally {
+				if (agendaRunFilter !== 'all' && !runs.some((run) => run.id === agendaRunFilter)) {
+					agendaRunFilter = 'all';
+				}
+				loading = false;
 			}
-		} catch (err) {
-			error = err instanceof Error ? err.message : 'Unable to load runs';
-		} finally {
-			loading = false;
-		}
 	}
 
 	async function loadScheduleAgenda() {
@@ -438,6 +443,15 @@
 					<button type="button" class="ghost" onclick={loadScheduleAgenda} disabled={busy || loadingScheduleAgenda}>Refresh</button>
 				</div>
 				<div class="agenda-filters" aria-label="Agenda filters">
+					<label>
+						Run
+						<select bind:value={agendaRunFilter}>
+							<option value="all">All runs</option>
+							{#each runs as run}
+								<option value={run.id}>{run.topic}</option>
+							{/each}
+						</select>
+					</label>
 					<label>
 						Status
 						<select bind:value={agendaStatusFilter}>

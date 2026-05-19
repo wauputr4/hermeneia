@@ -91,11 +91,11 @@ GET /v1/scheduled-posts
 
 The UI sends API query parameters for active agenda filters, such as
 `GET /v1/scheduled-posts?status=scheduled` by default and adding
-`platform={platform}` when a specific platform is selected. The optional
-browser-local date/time range controls are converted to RFC3339 `from` and
-`to` query parameters before refreshing the agenda. Choosing `all` or clearing
-the range omits that query parameter so the API returns the complete local set
-for that dimension.
+`run_id={run_id}` or `platform={platform}` when a specific run or platform is
+selected. The optional browser-local date/time range controls are converted to
+RFC3339 `from` and `to` query parameters before refreshing the agenda. Choosing
+`all` or clearing the range omits that query parameter so the API returns the
+complete local set for that dimension.
 
 It shows upcoming local schedule records grouped by browser-local calendar day
 after the active filters are applied. Each day header shows the row count and
@@ -110,9 +110,10 @@ metadata is ignored by the view model. Agenda loading errors stay isolated from
 the selected run review state so operators can keep inspecting run details even
 if the scheduled-post list fails.
 
-The agenda defaults to the `scheduled` status so active upcoming local records
-stay in focus. Status and platform filters are sent to the API and then applied
-again in the browser as a defensive display fallback. Operators can switch
+The agenda defaults to all runs and the `scheduled` status so active upcoming
+local records stay in focus. Run, status, and platform filters are sent to the
+API and then applied again in the browser as a defensive display fallback.
+Operators can switch
 status to `all` or `cancelled` to inspect cancelled local records without
 changing the selected run or run detail review state.
 

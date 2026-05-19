@@ -256,7 +256,7 @@ describe('web view model helpers', () => {
 		const posts = [
 			{ id: 'schedule-3', run_id: 'run-1', platform: 'linkedin', status: 'cancelled', scheduled_at: '2026-05-18T11:00:00Z' },
 			{ id: 'schedule-1', run_id: 'run-1', platform: 'instagram', status: 'scheduled', scheduled_at: '2026-05-18T09:00:00Z' },
-			{ id: 'schedule-2', run_id: 'run-1', platform: 'linkedin', status: 'scheduled', scheduled_at: '2026-05-18T10:00:00Z' }
+			{ id: 'schedule-2', run_id: 'run-2', platform: 'linkedin', status: 'scheduled', scheduled_at: '2026-05-18T10:00:00Z' }
 		];
 
 		assert.deepEqual(scheduleAgendaFilterOptions(posts, 'status'), ['cancelled', 'scheduled']);
@@ -268,6 +268,17 @@ describe('web view model helpers', () => {
 		assert.deepEqual(
 			scheduleAgendaRows(posts, [], { status: 'scheduled', platform: 'all' }).map((row) => row.id),
 			['schedule-1', 'schedule-2']
+		);
+		assert.deepEqual(
+			scheduleAgendaRows(posts, [], { runID: 'run-1', status: 'all', platform: 'all' }).map((row) => row.id),
+			['schedule-1', 'schedule-3']
+		);
+		assert.equal(
+			scheduleAgendaEmptyMessage(
+				{ runID: 'run-2', status: 'scheduled', platform: 'instagram' },
+				[{ id: 'run-2', topic: 'Launch calendar' }]
+			),
+			'No scheduled posts for Launch calendar match these filters.'
 		);
 		assert.equal(
 			scheduleAgendaEmptyMessage({ status: 'cancelled', platform: 'instagram' }),
@@ -340,7 +351,8 @@ describe('web view model helpers', () => {
 
 	it('builds scheduled-post API paths from agenda filters', () => {
 		assert.equal(scheduledPostsPath(), '/v1/scheduled-posts');
-		assert.equal(scheduledPostsPath({ status: 'all', platform: 'all' }), '/v1/scheduled-posts');
+		assert.equal(scheduledPostsPath({ run_id: 'all', status: 'all', platform: 'all' }), '/v1/scheduled-posts');
+		assert.equal(scheduledPostsPath({ run_id: 'run-1', status: 'all', platform: 'all' }), '/v1/scheduled-posts?run_id=run-1');
 		assert.equal(scheduledPostsPath({ status: 'scheduled', platform: 'all' }), '/v1/scheduled-posts?status=scheduled');
 		assert.equal(scheduledPostsPath({ status: 'all', platform: 'instagram' }), '/v1/scheduled-posts?platform=instagram');
 		assert.equal(
@@ -349,17 +361,18 @@ describe('web view model helpers', () => {
 		);
 		assert.equal(
 			scheduledPostsPath({
+				run_id: 'run-1',
 				status: 'scheduled',
 				platform: 'instagram',
 				from: '2026-05-18T09:00:00.000Z',
 				to: '2026-05-19T09:00:00.000Z'
 			}),
-			'/v1/scheduled-posts?status=scheduled&platform=instagram&from=2026-05-18T09%3A00%3A00.000Z&to=2026-05-19T09%3A00%3A00.000Z'
+			'/v1/scheduled-posts?run_id=run-1&status=scheduled&platform=instagram&from=2026-05-18T09%3A00%3A00.000Z&to=2026-05-19T09%3A00%3A00.000Z'
 		);
 	});
 
 	it('normalizes agenda date range filters for scheduled-post API requests', () => {
-		assert.deepEqual(scheduleAgendaQueryFilters({ status: 'all', platform: 'all', from: '', to: '' }), {
+		assert.deepEqual(scheduleAgendaQueryFilters({ runID: 'all', status: 'all', platform: 'all', from: '', to: '' }), {
 			filters: {},
 			error: ''
 		});
@@ -367,11 +380,13 @@ describe('web view model helpers', () => {
 			scheduleAgendaQueryFilters({
 				status: 'scheduled',
 				platform: 'linkedin',
+				runID: 'run-1',
 				from: '2026-05-18T09:00',
 				to: '2026-05-18T10:00'
 			}),
 			{
 				filters: {
+					run_id: 'run-1',
 					status: 'scheduled',
 					platform: 'linkedin',
 					from: '2026-05-18T09:00:00.000Z',

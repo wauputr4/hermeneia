@@ -79,24 +79,33 @@ export function scheduleAgendaFilterOptions(posts, field) {
 }
 
 export function filteredSchedulePosts(posts, filters = {}) {
+	const runID = filters.runID ?? filters.run_id ?? 'all';
 	const status = filters.status ?? 'all';
 	const platform = filters.platform ?? 'all';
 	const from = timestampFilterValue(filters.from);
 	const to = timestampFilterValue(filters.to);
 	return (posts ?? []).filter((post) => {
+		const matchesRun = runID === 'all' || post.run_id === runID;
 		const matchesStatus = status === 'all' || post.status === status;
 		const matchesPlatform = platform === 'all' || post.platform === platform;
 		const scheduledAt = timestampValue(post?.scheduled_at);
 		const matchesFrom = from === null || scheduledAt >= from;
 		const matchesTo = to === null || scheduledAt <= to;
-		return matchesStatus && matchesPlatform && matchesFrom && matchesTo;
+		return matchesRun && matchesStatus && matchesPlatform && matchesFrom && matchesTo;
 	});
 }
 
-export function scheduleAgendaEmptyMessage(filters = {}) {
+export function scheduleAgendaEmptyMessage(filters = {}, runs = []) {
+	const runID = filters.runID ?? filters.run_id ?? 'all';
 	const status = filters.status ?? 'all';
 	const platform = filters.platform ?? 'all';
 	const hasRange = Boolean(filters.from || filters.to);
+	const hasRun = runID !== 'all';
+	if (hasRun) {
+		const run = (runs ?? []).find((candidate) => candidate.id === runID);
+		const runLabel = run?.topic || runID;
+		return `No scheduled posts for ${runLabel} match these filters.`;
+	}
 	if (status === 'all' && platform === 'all' && !hasRange) {
 		return 'No local scheduled posts yet.';
 	}
@@ -114,6 +123,10 @@ export function scheduleAgendaEmptyMessage(filters = {}) {
 
 export function scheduleAgendaQueryFilters(filters = {}) {
 	const queryFilters = {};
+	const runID = filters.runID ?? filters.run_id;
+	if (runID && runID !== 'all') {
+		queryFilters.run_id = runID;
+	}
 	if (filters.status && filters.status !== 'all') {
 		queryFilters.status = filters.status;
 	}
