@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -165,6 +166,127 @@ func TestCLIAuditPassesForRenderedWorkflowRun(t *testing.T) {
 	if output := stdout.String(); !strings.Contains(output, "artifact audit passed for run-audit-cli") {
 		t.Fatalf("audit output missing pass message:\n%s", output)
 	}
+}
+
+func TestCLIAuditJSONPassesForRenderedWorkflowRun(t *testing.T) {
+	ctx := context.Background()
+	var stdout bytes.Buffer
+	dbPath := filepath.Join(t.TempDir(), "hermeneia.db")
+	runsRoot := filepath.Join(t.TempDir(), "runs")
+	t.Setenv("HERMENEIA_DATABASE_PATH", dbPath)
+
+	ids := 0
+	cmd := command{
+		stdout:   &stdout,
+		runsRoot: runsRoot,
+		newID: func(prefix, seed string) string {
+			if prefix == "run" {
+				return "run-audit-json-healthy"
+			}
+			ids++
+			return prefix + "-audit-json-healthy-" + string(rune('a'+ids))
+		},
+	}
+	if err := cmd.run(ctx, []string{"create", "--workflow", "simple-carousel", "--topic", "AI agents in marketing"}); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	if err := cmd.run(ctx, []string{"audit", "run-audit-json-healthy", "--json"}); err != nil {
+		t.Fatal(err)
+	}
+	var result artifactAuditJSON
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("audit JSON is invalid: %v\n%s", err, stdout.String())
+	}
+	if !result.Healthy || result.Run.ID != "run-audit-json-healthy" || len(result.Issues) != 0 {
+		t.Fatalf("unexpected audit JSON: %#v", result)
+	}
+}
+
+func TestCLIAuditJSONPrintsDriftPayloadBeforeReturningError(t *testing.T) {
+	ctx := context.Background()
+	var stdout bytes.Buffer
+	dbPath := filepath.Join(t.TempDir(), "hermeneia.db")
+	runsRoot := filepath.Join(t.TempDir(), "runs")
+	t.Setenv("HERMENEIA_DATABASE_PATH", dbPath)
+
+	ids := 0
+	cmd := command{
+		stdout:   &stdout,
+		runsRoot: runsRoot,
+		newID: func(prefix, seed string) string {
+			if prefix == "run" {
+				return "run-audit-json-drift"
+			}
+			ids++
+			return prefix + "-audit-json-drift-" + string(rune('a'+ids))
+		},
+	}
+	if err := cmd.run(ctx, []string{"create", "--workflow", "simple-carousel", "--topic", "AI agents in marketing"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(runsRoot, "run-audit-json-drift", "output", "carousel", "slide-01.png")); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	err := cmd.run(ctx, []string{"audit", "--run", "run-audit-json-drift", "--json"})
+	if err == nil || !errors.Is(err, workflow.ErrInvalidInput) {
+		t.Fatalf("expected audit drift error, got %v", err)
+	}
+	var result artifactAuditJSON
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &result); decodeErr != nil {
+		t.Fatalf("audit drift JSON is invalid: %v\n%s", decodeErr, stdout.String())
+	}
+	if result.Healthy || result.Run.ID != "run-audit-json-drift" || !artifactAuditJSONContains(result.Issues, "missing_file") {
+		t.Fatalf("unexpected audit drift JSON: %#v", result)
+	}
+}
+
+func TestCLIAuditHumanOutputReportsDriftTable(t *testing.T) {
+	ctx := context.Background()
+	var stdout bytes.Buffer
+	dbPath := filepath.Join(t.TempDir(), "hermeneia.db")
+	runsRoot := filepath.Join(t.TempDir(), "runs")
+	t.Setenv("HERMENEIA_DATABASE_PATH", dbPath)
+
+	ids := 0
+	cmd := command{
+		stdout:   &stdout,
+		runsRoot: runsRoot,
+		newID: func(prefix, seed string) string {
+			if prefix == "run" {
+				return "run-audit-human-drift"
+			}
+			ids++
+			return prefix + "-audit-human-drift-" + string(rune('a'+ids))
+		},
+	}
+	if err := cmd.run(ctx, []string{"create", "--workflow", "simple-carousel", "--topic", "AI agents in marketing"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(runsRoot, "run-audit-human-drift", "output", "carousel", "slide-01.png")); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	err := cmd.run(ctx, []string{"audit", "run-audit-human-drift"})
+	if err == nil || !errors.Is(err, workflow.ErrInvalidInput) {
+		t.Fatalf("expected audit drift error, got %v", err)
+	}
+	output := stdout.String()
+	for _, want := range []string{"artifact audit failed for run-audit-human-drift", "KIND", "ARTIFACT", "PATH", "MESSAGE", "missing_file"} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("audit human output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func artifactAuditJSONContains(issues []artifactAuditIssue, kind string) bool {
+	for _, issue := range issues {
+		if issue.Kind == kind {
+			return true
+		}
+	}
+	return false
 }
 
 func TestUnknownCommandReturnsClearError(t *testing.T) {

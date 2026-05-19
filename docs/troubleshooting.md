@@ -44,6 +44,10 @@ Important direction:
 `hermeneia audit <run-id>` is read-only. It exits successfully when every
 artifact row points to an existing file inside the run directory, stored
 checksums still match, and every file under `output/` is tracked in SQLite.
+Use `hermeneia audit <run-id> --json` when scripts need the stable structured
+payload with `run`, `healthy`, and `issues` fields. Drift JSON is printed before
+the command returns the normal non-zero audit status, so automation can archive
+the payload without parsing the human table.
 The local HTTP API exposes the same check through
 `GET /v1/runs/{run_id}/artifact-audit`. Healthy audits return `200 OK` with an
 empty `issues` list. Drift returns `409 Conflict` with the same structured

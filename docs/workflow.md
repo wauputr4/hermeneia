@@ -109,6 +109,12 @@ The CLI MVP keeps renderer boundaries explicit:
 - SQLite stores artifact metadata and checksums.
 - Files remain inspectable under the run directory.
 
+Use `hermeneia audit <run-id>` after rendering to verify artifact rows against
+the run folder. Add `--json` when automation needs the stable structured
+payload with run metadata, `healthy`, and `issues`; if drift is found, the CLI
+prints the JSON payload before returning the same non-zero audit status as the
+human table output.
+
 The first carousel renderer is a deterministic Go PNG renderer for `carousel/ai-news-clean`.
 The first video path writes a Remotion-ready scene contract to `output/video/remotion-input.json` and creates a local MP4 output for the MVP loop. The Remotion composition scaffold in `packages/renderer-video` consumes the same contract.
 
