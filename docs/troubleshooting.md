@@ -227,13 +227,13 @@ Important guardrails:
   should remain visible without a repeated cancel action. Agenda cancellation
   errors are shown in the agenda panel and should not clear the selected run
   review state.
-- The CLI `hermeneia schedules` command accepts `--run`, `--status`,
-  `--platform`, `--from`, and `--to` filters. Invalid statuses, unsupported
-  platforms, invalid RFC3339 range values, or inverted ranges return a clear
-  non-zero error; omit a flag to leave that dimension unfiltered. Unknown run
-  IDs return the normal empty schedule result. The human table includes an
-  `ARTIFACT ID` column and prints `none` for schedules that were created
-  without a selected artifact.
+- The CLI `hermeneia schedules` command accepts `--run`, `--artifact`,
+  `--status`, `--platform`, `--from`, and `--to` filters. Invalid statuses,
+  unsupported platforms, invalid RFC3339 range values, or inverted ranges
+  return a clear non-zero error; omit a flag to leave that dimension unfiltered.
+  Unknown run or artifact IDs return the normal empty schedule result. The human
+  table includes an `ARTIFACT ID` column and prints `none` for schedules that
+  were created without a selected artifact.
 - Add `--json` to `hermeneia schedules` when automation needs structured rows
   instead of the human table. Filter validation still happens before JSON is
   printed, so invalid filter values should fail with no partial JSON output.

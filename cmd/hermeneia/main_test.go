@@ -415,6 +415,14 @@ func TestCLIContentRunWorkflow(t *testing.T) {
 	}
 
 	stdout.Reset()
+	if err := cmd.run(ctx, []string{"schedules", "--artifact", artifactID}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "linkedin") || strings.Contains(stdout.String(), "instagram") {
+		t.Fatalf("unexpected artifact-filtered schedules output:\n%s", stdout.String())
+	}
+
+	stdout.Reset()
 	if err := cmd.run(ctx, []string{"schedules", "--status", "scheduled", "--platform", "linkedin"}); err != nil {
 		t.Fatal(err)
 	}
@@ -461,6 +469,26 @@ func TestCLIContentRunWorkflow(t *testing.T) {
 	}
 	if filteredScheduleRows[0].Validation["requires_platform_connector"] != true {
 		t.Fatalf("filtered JSON schedule row missing validation metadata: %#v", filteredScheduleRows[0])
+	}
+
+	stdout.Reset()
+	if err := cmd.run(ctx, []string{"schedules", "--artifact", artifactID, "--status", "scheduled", "--platform", "linkedin", "--json"}); err != nil {
+		t.Fatal(err)
+	}
+	var artifactFilteredScheduleRows []scheduleJSONRow
+	if err := json.Unmarshal(stdout.Bytes(), &artifactFilteredScheduleRows); err != nil {
+		t.Fatalf("artifact-filtered schedules --json did not print valid JSON: %v\n%s", err, stdout.String())
+	}
+	if len(artifactFilteredScheduleRows) != 1 || artifactFilteredScheduleRows[0].ArtifactID != artifactID || artifactFilteredScheduleRows[0].Platform != "linkedin" {
+		t.Fatalf("unexpected artifact-filtered JSON schedule rows: %#v", artifactFilteredScheduleRows)
+	}
+
+	stdout.Reset()
+	if err := cmd.run(ctx, []string{"schedules", "--artifact", "missing-artifact"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := stdout.String(); got != "no scheduled posts found\n" {
+		t.Fatalf("unexpected missing-artifact schedules output: %q", got)
 	}
 
 	stdout.Reset()
