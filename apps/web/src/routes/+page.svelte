@@ -26,6 +26,7 @@
 		artifactKindLabel,
 		artifactKindOptions,
 		artifactPreviewType,
+		artifactScheduleSummaries,
 		artifactsForKind,
 		auditIssueRows,
 		auditStatusLabel,
@@ -106,6 +107,9 @@
 		selectedDetails ? artifactsForKind(selectedDetails.artifacts, artifactKindFilter) : []
 	);
 	const groupedArtifacts = $derived(visibleArtifacts ? [...artifactGroups(visibleArtifacts).entries()] : []);
+	const artifactSchedules = $derived(
+		selectedDetails ? artifactScheduleSummaries(selectedDetails.artifacts, selectedDetails.scheduled_posts) : new Map()
+	);
 	const selectedTemplateOptions = $derived(
 		templatesForType(templates, createForm.content_type)
 	);
@@ -687,6 +691,7 @@
 										{#each artifacts as artifact}
 											{@const previewType = artifactPreviewType(artifact)}
 											{@const fileURL = artifactFileURL(artifact)}
+											{@const schedule = artifactSchedules.get(artifact.id)}
 											<div class:media-artifact={previewType} class="artifact-card">
 												{#if previewType === 'image'}
 													<img src={fileURL} alt={artifact.path} loading="lazy" />
@@ -697,6 +702,13 @@
 													<strong>{artifactDisplayName(artifact)}</strong>
 													<span>{artifact.path}</span>
 													<small>{formatShortDate(artifact.created_at)} / {artifact.checksum || 'no checksum'}</small>
+													<div class:active={schedule?.hasSchedules} class="artifact-schedule">
+														<strong>{schedule?.hasSchedules ? `${schedule.count} scheduled post${schedule.count === 1 ? '' : 's'}` : 'No local schedules'}</strong>
+														<span>{schedule?.hasSchedules ? schedule.statusLabel : 'Not attached to a schedule record'}</span>
+														{#if schedule?.timeLabel}
+															<small>{schedule.timeLabel}</small>
+														{/if}
+													</div>
 													<div class="artifact-links">
 														<a href={fileURL} target="_blank" rel="noreferrer">Open</a>
 														<a href={fileURL} download={artifactDisplayName(artifact)}>Download</a>
@@ -1382,6 +1394,25 @@
 		.artifact-meta span,
 		.artifact-meta small {
 			color: #657166;
+		}
+
+		.artifact-schedule {
+			display: grid;
+			gap: 3px;
+			border: 1px solid #d5cdbb;
+			background: #f8f0df;
+			padding: 7px;
+		}
+
+		.artifact-schedule.active {
+			border-color: #8b2d1e;
+			background: #f4e2cd;
+		}
+
+		.artifact-schedule strong {
+			font-family: 'Courier New', monospace;
+			font-size: 0.72rem;
+			text-transform: uppercase;
 		}
 
 		.artifact-links {

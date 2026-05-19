@@ -41,6 +41,56 @@ export function artifactDisplayName(artifact) {
 	return artifact.path?.split(/[\\/]/)?.at(-1) || artifact.id;
 }
 
+export function artifactScheduleSummaries(artifacts, scheduledPosts, now = new Date()) {
+	const schedulesByArtifact = new Map();
+	for (const post of scheduledPosts ?? []) {
+		if (!post?.artifact_id) {
+			continue;
+		}
+		const schedules = schedulesByArtifact.get(post.artifact_id) ?? [];
+		schedules.push(post);
+		schedulesByArtifact.set(post.artifact_id, schedules);
+	}
+
+	return new Map((artifacts ?? []).map((artifact) => [artifact.id, artifactScheduleSummary(schedulesByArtifact.get(artifact.id), now)]));
+}
+
+export function artifactScheduleSummary(scheduledPosts, now = new Date()) {
+	const posts = [...(scheduledPosts ?? [])].filter((post) => post?.artifact_id);
+	if (posts.length === 0) {
+		return {
+			hasSchedules: false,
+			count: 0,
+			statusLabel: 'No local schedules',
+			timeLabel: '',
+			nextScheduledAt: '',
+			latestScheduledAt: ''
+		};
+	}
+
+	const statusCounts = new Map();
+	for (const post of posts) {
+		const status = post.status || 'unknown';
+		statusCounts.set(status, (statusCounts.get(status) ?? 0) + 1);
+	}
+	const statusLabel = [...statusCounts.entries()]
+		.sort(([left], [right]) => left.localeCompare(right))
+		.map(([status, count]) => `${count} ${status}`)
+		.join(', ');
+	const sorted = [...posts].sort(compareScheduledPost);
+	const nowTimestamp = timestampValue(now);
+	const next = sorted.find((post) => post.status === 'scheduled' && timestampValue(post.scheduled_at) >= nowTimestamp);
+	const latest = [...sorted].reverse()[0];
+	return {
+		hasSchedules: true,
+		count: posts.length,
+		statusLabel,
+		timeLabel: next ? `Next ${formatShortDate(next.scheduled_at)}` : `Latest ${formatShortDate(latest.scheduled_at)}`,
+		nextScheduledAt: next?.scheduled_at ?? '',
+		latestScheduledAt: latest?.scheduled_at ?? ''
+	};
+}
+
 export function auditStatusLabel(audit) {
 	if (!audit) {
 		return 'Not checked';
