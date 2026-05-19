@@ -132,6 +132,12 @@ func TestServerContentRunWorkflow(t *testing.T) {
 	if len(scheduleList.ScheduledPosts) != 2 || scheduleList.ScheduledPosts[0].RunID != created.Run.ID || scheduleList.ScheduledPosts[1].RunID != created.Run.ID {
 		t.Fatalf("run-filtered schedule list mismatch: %#v", scheduleList.ScheduledPosts)
 	}
+	artifactSchedules := request(t, handler, http.MethodGet, "/v1/scheduled-posts?artifact_id="+renderResult.Artifacts[0].ID, "")
+	assertStatus(t, artifactSchedules, http.StatusOK)
+	decodeResponse(t, artifactSchedules, &scheduleList)
+	if len(scheduleList.ScheduledPosts) != 1 || scheduleList.ScheduledPosts[0].ID != scheduled.Post.ID {
+		t.Fatalf("artifact-filtered schedule list mismatch: %#v", scheduleList.ScheduledPosts)
+	}
 	instagramSchedules := request(t, handler, http.MethodGet, "/v1/scheduled-posts?platform=instagram", "")
 	assertStatus(t, instagramSchedules, http.StatusOK)
 	decodeResponse(t, instagramSchedules, &scheduleList)
@@ -150,17 +156,23 @@ func TestServerContentRunWorkflow(t *testing.T) {
 	if len(scheduleList.ScheduledPosts) != 2 || scheduleList.ScheduledPosts[0].ID != scheduled.Post.ID || scheduleList.ScheduledPosts[1].ID != otherScheduled.Post.ID {
 		t.Fatalf("combined-filter schedule list mismatch: %#v", scheduleList.ScheduledPosts)
 	}
-	runCombined := request(t, handler, http.MethodGet, "/v1/scheduled-posts?run_id="+created.Run.ID+"&status=scheduled&platform=instagram&from="+scheduledAt+"&to="+youtubeScheduledAt, "")
+	runCombined := request(t, handler, http.MethodGet, "/v1/scheduled-posts?run_id="+created.Run.ID+"&artifact_id="+renderResult.Artifacts[0].ID+"&status=scheduled&platform=instagram&from="+scheduledAt+"&to="+youtubeScheduledAt, "")
 	assertStatus(t, runCombined, http.StatusOK)
 	decodeResponse(t, runCombined, &scheduleList)
 	if len(scheduleList.ScheduledPosts) != 1 || scheduleList.ScheduledPosts[0].ID != scheduled.Post.ID {
-		t.Fatalf("run combined-filter schedule list mismatch: %#v", scheduleList.ScheduledPosts)
+		t.Fatalf("run/artifact combined-filter schedule list mismatch: %#v", scheduleList.ScheduledPosts)
 	}
 	missingRunSchedules := request(t, handler, http.MethodGet, "/v1/scheduled-posts?run_id=missing-run", "")
 	assertStatus(t, missingRunSchedules, http.StatusOK)
 	decodeResponse(t, missingRunSchedules, &scheduleList)
 	if len(scheduleList.ScheduledPosts) != 0 {
 		t.Fatalf("missing run schedule list mismatch: %#v", scheduleList.ScheduledPosts)
+	}
+	missingArtifactSchedules := request(t, handler, http.MethodGet, "/v1/scheduled-posts?artifact_id=missing-artifact", "")
+	assertStatus(t, missingArtifactSchedules, http.StatusOK)
+	decodeResponse(t, missingArtifactSchedules, &scheduleList)
+	if len(scheduleList.ScheduledPosts) != 0 {
+		t.Fatalf("missing artifact schedule list mismatch: %#v", scheduleList.ScheduledPosts)
 	}
 	rangeFiltered := request(t, handler, http.MethodGet, "/v1/scheduled-posts?from="+scheduledAt+"&to="+scheduledAt, "")
 	assertStatus(t, rangeFiltered, http.StatusOK)

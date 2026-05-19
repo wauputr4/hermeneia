@@ -98,6 +98,34 @@ func TestServiceCreateReviseAndRenderCarouselRun(t *testing.T) {
 	if !strings.Contains(scheduled.Post.ValidationJSON, `"credentials_stored_in_db":false`) {
 		t.Fatalf("validation must not store credentials: %s", scheduled.Post.ValidationJSON)
 	}
+	artifactFiltered, err := service.ListScheduledPostsFiltered(ctx, ScheduleListInput{ArtifactID: rendered.Artifacts[0].ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(artifactFiltered) != 1 || artifactFiltered[0].ID != scheduled.Post.ID {
+		t.Fatalf("unexpected artifact-filtered schedules: %#v", artifactFiltered)
+	}
+	combinedFiltered, err := service.ListScheduledPostsFiltered(ctx, ScheduleListInput{
+		RunID:      created.Run.ID,
+		ArtifactID: rendered.Artifacts[0].ID,
+		Status:     "scheduled",
+		Platform:   "instagram",
+		From:       scheduledAt.Format(time.RFC3339),
+		To:         scheduledAt.Format(time.RFC3339),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(combinedFiltered) != 1 || combinedFiltered[0].ID != scheduled.Post.ID {
+		t.Fatalf("unexpected combined artifact-filtered schedules: %#v", combinedFiltered)
+	}
+	missingArtifactFiltered, err := service.ListScheduledPostsFiltered(ctx, ScheduleListInput{ArtifactID: "missing-artifact"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(missingArtifactFiltered) != 0 {
+		t.Fatalf("expected missing artifact to return no schedules, got %#v", missingArtifactFiltered)
+	}
 	cancelled, err := service.UpdateScheduledPostStatus(ctx, ScheduleStatusInput{ScheduleID: scheduled.Post.ID, Status: "cancelled"})
 	if err != nil {
 		t.Fatal(err)

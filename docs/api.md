@@ -342,6 +342,8 @@ Optional query parameters:
 
 - `run_id`: return only scheduled posts for one content run. Unknown run IDs
   return `200 OK` with an empty `scheduled_posts` array.
+- `artifact_id`: return only scheduled posts tied to one rendered artifact.
+  Unknown artifact IDs return `200 OK` with an empty `scheduled_posts` array.
 - `status`: one of `scheduled`, `publishing`, `published`, `failed`, or `cancelled`.
 - `platform`: one of `instagram`, `facebook`, `youtube`, `tiktok`, or `linkedin`.
 - `from`: inclusive RFC3339 lower bound for `scheduled_at`.
@@ -350,7 +352,7 @@ Optional query parameters:
 Filters can be combined, for example:
 
 ```http
-GET /v1/scheduled-posts?run_id=run-123&status=scheduled&platform=instagram&from=2026-05-10T00:00:00Z&to=2026-05-11T00:00:00Z
+GET /v1/scheduled-posts?run_id=run-123&artifact_id=artifact-123&status=scheduled&platform=instagram&from=2026-05-10T00:00:00Z&to=2026-05-11T00:00:00Z
 ```
 
 Invalid filter values, malformed timestamps, and `from` values after `to`
