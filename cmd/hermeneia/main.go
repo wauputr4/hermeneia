@@ -308,18 +308,27 @@ func (c command) render(ctx context.Context, args []string) error {
 }
 
 func (c command) audit(ctx context.Context, args []string) error {
-	runID, err := parseRunArgs(args)
+	runID, jsonOutput, err := parseAuditArgs(args)
 	if err != nil {
 		return err
 	}
 	return c.withService(ctx, func(s *workflow.Service) error {
 		result, err := s.AuditRunArtifacts(ctx, runID)
 		if err == nil {
+			if jsonOutput {
+				return encodeArtifactAuditJSON(c.stdout, result)
+			}
 			fmt.Fprintf(c.stdout, "artifact audit passed for %s\n", result.Run.ID)
 			return nil
 		}
 		var auditErr workflow.ArtifactAuditError
 		if !errors.As(err, &auditErr) {
+			return err
+		}
+		if jsonOutput {
+			if encodeErr := encodeArtifactAuditJSON(c.stdout, result); encodeErr != nil {
+				return encodeErr
+			}
 			return err
 		}
 		fmt.Fprintf(c.stdout, "artifact audit failed for %s\n", result.Run.ID)
@@ -333,6 +342,97 @@ func (c command) audit(ctx context.Context, args []string) error {
 		}
 		return err
 	})
+}
+
+func parseAuditArgs(args []string) (string, bool, error) {
+	var runID string
+	var jsonOutput bool
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--json" {
+			jsonOutput = true
+			continue
+		}
+		if value, ok := strings.CutPrefix(arg, "--run="); ok {
+			if runID != "" {
+				return "", false, fmt.Errorf("unexpected argument %q", value)
+			}
+			runID = value
+			continue
+		}
+		if arg == "--run" {
+			i++
+			if i >= len(args) {
+				return "", false, errors.New("--run requires a value")
+			}
+			if runID != "" {
+				return "", false, fmt.Errorf("unexpected argument %q", args[i])
+			}
+			runID = args[i]
+			continue
+		}
+		if strings.HasPrefix(arg, "-") {
+			return "", false, fmt.Errorf("unknown flag %q", arg)
+		}
+		if runID != "" {
+			return "", false, fmt.Errorf("unexpected argument %q", arg)
+		}
+		runID = arg
+	}
+	if runID == "" {
+		return "", false, fmt.Errorf("audit requires exactly one run id")
+	}
+	return runID, jsonOutput, nil
+}
+
+type artifactAuditJSON struct {
+	Run     runJSON              `json:"run"`
+	Healthy bool                 `json:"healthy"`
+	Issues  []artifactAuditIssue `json:"issues"`
+}
+
+type runJSON struct {
+	ID          string    `json:"id"`
+	Topic       string    `json:"topic"`
+	ContentType string    `json:"content_type"`
+	TemplateID  string    `json:"template_id"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type artifactAuditIssue struct {
+	Kind       string `json:"kind"`
+	ArtifactID string `json:"artifact_id,omitempty"`
+	Path       string `json:"path,omitempty"`
+	Message    string `json:"message"`
+}
+
+func encodeArtifactAuditJSON(w io.Writer, result workflow.ArtifactAuditResult) error {
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(newArtifactAuditJSON(result))
+}
+
+func newArtifactAuditJSON(result workflow.ArtifactAuditResult) artifactAuditJSON {
+	issues := make([]artifactAuditIssue, 0, len(result.Issues))
+	for _, issue := range result.Issues {
+		issues = append(issues, artifactAuditIssue{
+			Kind:       issue.Kind,
+			ArtifactID: issue.ArtifactID,
+			Path:       issue.Path,
+			Message:    issue.Message,
+		})
+	}
+	return artifactAuditJSON{
+		Run: runJSON{
+			ID:          result.Run.ID,
+			Topic:       result.Run.Topic,
+			ContentType: result.Run.ContentType,
+			TemplateID:  result.Run.TemplateID,
+			CreatedAt:   result.Run.CreatedAt,
+		},
+		Healthy: len(issues) == 0,
+		Issues:  issues,
+	}
 }
 
 func (c command) schedule(ctx context.Context, args []string) error {
@@ -778,6 +878,7 @@ Examples:
   hermeneia revise <run-id> --instruction "Make the hook sharper"
   hermeneia render <run-id>
   hermeneia audit <run-id>
+  hermeneia audit <run-id> --json
   hermeneia schedule <run-id> --platform instagram --at 2026-05-10T02:00:00Z
   hermeneia schedules --artifact <artifact-id> --json
   hermeneia schedules --status scheduled --from 2026-05-10T00:00:00Z --to 2026-05-11T00:00:00Z
