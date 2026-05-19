@@ -187,6 +187,7 @@ type ScheduleResult struct {
 }
 
 type ScheduleListInput struct {
+	RunID    string
 	Status   string
 	Platform string
 	From     string
@@ -919,6 +920,7 @@ func (s *Service) ListScheduledPosts(ctx context.Context) ([]storage.ScheduledPo
 }
 
 func (s *Service) ListScheduledPostsFiltered(ctx context.Context, input ScheduleListInput) ([]storage.ScheduledPost, error) {
+	runID := strings.TrimSpace(input.RunID)
 	status := strings.ToLower(strings.TrimSpace(input.Status))
 	if status != "" && !supportedScheduledPostStatus(status) {
 		return nil, invalidInput(fmt.Sprintf("unsupported scheduled post status %q", input.Status))
@@ -938,7 +940,7 @@ func (s *Service) ListScheduledPostsFiltered(ctx context.Context, input Schedule
 	if from != nil && to != nil && from.After(*to) {
 		return nil, invalidInput("from must be before or equal to to")
 	}
-	return s.Repo.ListScheduledPostsFiltered(ctx, storage.ScheduledPostFilters{Status: status, Platform: platform, From: from, To: to})
+	return s.Repo.ListScheduledPostsFiltered(ctx, storage.ScheduledPostFilters{RunID: runID, Status: status, Platform: platform, From: from, To: to})
 }
 
 func optionalScheduleTimeFilter(name, value string) (*time.Time, error) {

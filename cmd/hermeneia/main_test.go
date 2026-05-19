@@ -567,6 +567,50 @@ func TestScheduleValidationObjectEmptyFallback(t *testing.T) {
 	}
 }
 
+func TestCLISchedulesRunFilter(t *testing.T) {
+	ctx := context.Background()
+	var stdout bytes.Buffer
+	dbPath := filepath.Join(t.TempDir(), "hermeneia.db")
+	t.Setenv("HERMENEIA_DATABASE_PATH", dbPath)
+	seedCLIScheduleFilterData(t, ctx, dbPath)
+
+	cmd := command{stdout: &stdout}
+	if err := cmd.run(ctx, []string{"schedules", "--run", "run-alpha"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "schedule-alpha-instagram") || !strings.Contains(stdout.String(), "schedule-alpha-youtube") || strings.Contains(stdout.String(), "schedule-beta-instagram") {
+		t.Fatalf("unexpected run-filtered schedules output:\n%s", stdout.String())
+	}
+
+	stdout.Reset()
+	if err := cmd.run(ctx, []string{"schedules", "--run", "run-alpha", "--platform", "youtube", "--status", "scheduled", "--from", "2026-05-10T03:00:00Z", "--to", "2026-05-10T03:00:00Z"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "schedule-alpha-youtube") || strings.Contains(stdout.String(), "schedule-alpha-instagram") || strings.Contains(stdout.String(), "schedule-beta-instagram") {
+		t.Fatalf("unexpected combined run-filtered schedules output:\n%s", stdout.String())
+	}
+
+	stdout.Reset()
+	if err := cmd.run(ctx, []string{"schedules", "--run", "run-alpha", "--json"}); err != nil {
+		t.Fatal(err)
+	}
+	var rows []scheduleJSONRow
+	if err := json.Unmarshal(stdout.Bytes(), &rows); err != nil {
+		t.Fatalf("run-filtered schedules --json did not print valid JSON: %v\n%s", err, stdout.String())
+	}
+	if len(rows) != 2 || rows[0].RunID != "run-alpha" || rows[1].RunID != "run-alpha" {
+		t.Fatalf("unexpected run-filtered JSON schedules: %#v", rows)
+	}
+
+	stdout.Reset()
+	if err := cmd.run(ctx, []string{"schedules", "--run", "missing-run"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := stdout.String(); got != "no scheduled posts found\n" {
+		t.Fatalf("unexpected missing-run schedules output: %q", got)
+	}
+}
+
 func firstCLITestArtifactID(t *testing.T, ctx context.Context, dbPath, runID string) string {
 	t.Helper()
 	db, err := storage.Open(dbPath)
@@ -582,4 +626,35 @@ func firstCLITestArtifactID(t *testing.T, ctx context.Context, dbPath, runID str
 		t.Fatal("expected rendered artifacts")
 	}
 	return artifacts[0].ID
+}
+
+func seedCLIScheduleFilterData(t *testing.T, ctx context.Context, dbPath string) {
+	t.Helper()
+	db, err := storage.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := storage.Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	repo := storage.NewRepository(db)
+	if err := repo.CreateTemplate(ctx, storage.Template{ID: "carousel/ai-news-clean", Name: "AI News Clean Carousel", ContentType: "carousel"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, runID := range []string{"run-alpha", "run-beta"} {
+		if err := repo.CreateContentRun(ctx, storage.ContentRun{ID: runID, Topic: runID, ContentType: "carousel", TemplateID: "carousel/ai-news-clean"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	posts := []storage.ScheduledPost{
+		{ID: "schedule-alpha-instagram", RunID: "run-alpha", Platform: "instagram", ScheduledAt: time.Date(2026, 5, 10, 2, 0, 0, 0, time.UTC), Status: "scheduled"},
+		{ID: "schedule-alpha-youtube", RunID: "run-alpha", Platform: "youtube", ScheduledAt: time.Date(2026, 5, 10, 3, 0, 0, 0, time.UTC), Status: "scheduled"},
+		{ID: "schedule-beta-instagram", RunID: "run-beta", Platform: "instagram", ScheduledAt: time.Date(2026, 5, 10, 4, 0, 0, 0, time.UTC), Status: "scheduled"},
+	}
+	for _, post := range posts {
+		if err := repo.CreateScheduledPost(ctx, post); err != nil {
+			t.Fatal(err)
+		}
+	}
 }

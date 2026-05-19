@@ -134,6 +134,7 @@ type ScheduledPost struct {
 }
 
 type ScheduledPostFilters struct {
+	RunID    string
 	Status   string
 	Platform string
 	From     *time.Time
@@ -389,6 +390,10 @@ func (r *Repository) ListScheduledPostsFiltered(ctx context.Context, filters Sch
 	query := `SELECT id, run_id, artifact_id, platform, scheduled_at, status, validation_json, created_at, updated_at FROM scheduled_posts`
 	var where []string
 	var args []any
+	if filters.RunID != "" {
+		where = append(where, "run_id = ?")
+		args = append(args, filters.RunID)
+	}
 	if filters.Status != "" {
 		where = append(where, "status = ?")
 		args = append(args, filters.Status)
