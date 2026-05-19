@@ -259,6 +259,21 @@ export function scheduleAgendaRows(posts, runs = [], filters = {}) {
 	});
 }
 
+export function selectedRunScheduleRows(scheduledPosts) {
+	return [...(scheduledPosts ?? [])].sort(compareScheduledPost).map((post) => ({
+		id: post.id || 'n/a',
+		platform: post.platform || 'n/a',
+		status: post.status || 'n/a',
+		artifactID: post.artifact_id || 'none',
+		scheduledAt: post.scheduled_at,
+		timeLabel: formatShortDate(post.scheduled_at)
+	}));
+}
+
+export function selectedRunScheduleEmptyMessage(scheduledPosts) {
+	return (scheduledPosts ?? []).length === 0 ? 'No local schedules for this run yet.' : '';
+}
+
 export function scheduleAgendaGroups(posts, runs = [], filters = {}) {
 	const rows = scheduleAgendaRows(posts, runs, filters);
 	const groups = [];

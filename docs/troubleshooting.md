@@ -219,6 +219,11 @@ Important guardrails:
   research artifacts. If the selected run changes and the previous artifact is
   not available there, the UI resets the agenda artifact filter to all artifacts
   before refreshing.
+- The selected run detail schedule history is derived from
+  `selectedDetails.scheduled_posts`, not from the sidebar agenda request. If the
+  history looks stale after creating or cancelling a schedule, confirm the
+  selected run detail was refreshed and that the API `GET /v1/runs/{run_id}`
+  payload includes the expected schedule rows.
 - Web UI artifact cards derive their schedule badges from the selected run
   detail payload. If a rendered artifact shows `No local schedules`, compare
   its artifact ID with the run's `scheduled_posts` rows before adding a new API
