@@ -134,11 +134,12 @@ type ScheduledPost struct {
 }
 
 type ScheduledPostFilters struct {
-	RunID    string
-	Status   string
-	Platform string
-	From     *time.Time
-	To       *time.Time
+	RunID      string
+	ArtifactID string
+	Status     string
+	Platform   string
+	From       *time.Time
+	To         *time.Time
 }
 
 type Repository struct{ db *sql.DB }
@@ -393,6 +394,10 @@ func (r *Repository) ListScheduledPostsFiltered(ctx context.Context, filters Sch
 	if filters.RunID != "" {
 		where = append(where, "run_id = ?")
 		args = append(args, filters.RunID)
+	}
+	if filters.ArtifactID != "" {
+		where = append(where, "artifact_id = ?")
+		args = append(args, filters.ArtifactID)
 	}
 	if filters.Status != "" {
 		where = append(where, "status = ?")

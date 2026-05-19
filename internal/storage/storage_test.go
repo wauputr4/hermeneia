@@ -151,10 +151,22 @@ func TestRepositoryListScheduledPostsFiltered(t *testing.T) {
 	if err := repo.CreateContentRun(ctx, ContentRun{ID: "run-2", Topic: "Video agents", ContentType: "carousel", TemplateID: "tpl-1"}); err != nil {
 		t.Fatal(err)
 	}
+	if err := repo.CreateBriefVersion(ctx, BriefVersion{ID: "brief-1", RunID: "run-1", Version: 1, BodyJSON: `{"topic":"AI agents"}`}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.CreateBriefVersion(ctx, BriefVersion{ID: "brief-2", RunID: "run-2", Version: 1, BodyJSON: `{"topic":"Video agents"}`}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.CreateArtifact(ctx, Artifact{ID: "artifact-1", RunID: "run-1", BriefVersionID: "brief-1", Kind: "carousel_png", Path: "runs/run-1/output/carousel/slide-01.png"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.CreateArtifact(ctx, Artifact{ID: "artifact-2", RunID: "run-2", BriefVersionID: "brief-2", Kind: "carousel_png", Path: "runs/run-2/output/carousel/slide-01.png"}); err != nil {
+		t.Fatal(err)
+	}
 	posts := []ScheduledPost{
-		{ID: "schedule-1", RunID: "run-1", Platform: "instagram", ScheduledAt: mustTime(t, "2026-05-10T02:00:00Z"), Status: "scheduled"},
-		{ID: "schedule-2", RunID: "run-2", Platform: "youtube", ScheduledAt: mustTime(t, "2026-05-10T03:00:00Z"), Status: "scheduled"},
-		{ID: "schedule-3", RunID: "run-1", Platform: "instagram", ScheduledAt: mustTime(t, "2026-05-10T04:00:00Z"), Status: "cancelled"},
+		{ID: "schedule-1", RunID: "run-1", ArtifactID: "artifact-1", Platform: "instagram", ScheduledAt: mustTime(t, "2026-05-10T02:00:00Z"), Status: "scheduled"},
+		{ID: "schedule-2", RunID: "run-2", ArtifactID: "artifact-2", Platform: "youtube", ScheduledAt: mustTime(t, "2026-05-10T03:00:00Z"), Status: "scheduled"},
+		{ID: "schedule-3", RunID: "run-1", ArtifactID: "artifact-1", Platform: "instagram", ScheduledAt: mustTime(t, "2026-05-10T04:00:00Z"), Status: "cancelled"},
 	}
 	for _, post := range posts {
 		if err := repo.CreateScheduledPost(ctx, post); err != nil {
@@ -197,6 +209,13 @@ func TestRepositoryListScheduledPostsFiltered(t *testing.T) {
 	if len(runScoped) != 2 || runScoped[0].ID != "schedule-1" || runScoped[1].ID != "schedule-3" {
 		t.Fatalf("unexpected run-filtered schedules: %#v", runScoped)
 	}
+	artifactScoped, err := repo.ListScheduledPostsFiltered(ctx, ScheduledPostFilters{ArtifactID: "artifact-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(artifactScoped) != 2 || artifactScoped[0].ID != "schedule-1" || artifactScoped[1].ID != "schedule-3" {
+		t.Fatalf("unexpected artifact-filtered schedules: %#v", artifactScoped)
+	}
 	from := mustTime(t, "2026-05-10T03:00:00Z")
 	to := mustTime(t, "2026-05-10T04:00:00Z")
 	ranged, err := repo.ListScheduledPostsFiltered(ctx, ScheduledPostFilters{From: &from, To: &to})
@@ -213,12 +232,12 @@ func TestRepositoryListScheduledPostsFiltered(t *testing.T) {
 	if len(combinedRange) != 1 || combinedRange[0].ID != "schedule-2" {
 		t.Fatalf("unexpected combined range-filtered schedules: %#v", combinedRange)
 	}
-	runCombined, err := repo.ListScheduledPostsFiltered(ctx, ScheduledPostFilters{RunID: "run-1", Status: "cancelled", Platform: "instagram", From: &from, To: &to})
+	runCombined, err := repo.ListScheduledPostsFiltered(ctx, ScheduledPostFilters{RunID: "run-1", ArtifactID: "artifact-1", Status: "cancelled", Platform: "instagram", From: &from, To: &to})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(runCombined) != 1 || runCombined[0].ID != "schedule-3" {
-		t.Fatalf("unexpected run combined-filter schedules: %#v", runCombined)
+		t.Fatalf("unexpected run/artifact combined-filter schedules: %#v", runCombined)
 	}
 	missingRun, err := repo.ListScheduledPostsFiltered(ctx, ScheduledPostFilters{RunID: "missing-run"})
 	if err != nil {
@@ -226,6 +245,13 @@ func TestRepositoryListScheduledPostsFiltered(t *testing.T) {
 	}
 	if len(missingRun) != 0 {
 		t.Fatalf("expected missing run filter to return no schedules, got %#v", missingRun)
+	}
+	missingArtifact, err := repo.ListScheduledPostsFiltered(ctx, ScheduledPostFilters{ArtifactID: "missing-artifact"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(missingArtifact) != 0 {
+		t.Fatalf("expected missing artifact filter to return no schedules, got %#v", missingArtifact)
 	}
 }
 
