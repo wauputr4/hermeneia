@@ -229,7 +229,8 @@ Important guardrails:
   `--from`, and `--to` filters using the same validation as the API. Invalid
   statuses, unsupported platforms, invalid RFC3339 range values, or inverted
   ranges return a clear non-zero error; omit a flag to leave that dimension
-  unfiltered.
+  unfiltered. The human table includes an `ARTIFACT ID` column and prints
+  `none` for schedules that were created without a selected artifact.
 - Add `--json` to `hermeneia schedules` when automation needs structured rows
   instead of the human table. Filter validation still happens before JSON is
   printed, so invalid filter values should fail with no partial JSON output.

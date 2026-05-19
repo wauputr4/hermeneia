@@ -213,9 +213,11 @@ YouTube, TikTok, LinkedIn, or any other external publishing platform.
 Use optional `--status`, `--platform`, `--from`, and `--to` filters with
 `hermeneia schedules` for focused local inspection. Omitting a flag leaves that
 dimension unfiltered. `--from` and `--to` must be RFC3339 timestamps, are
-inclusive, and fail before output when the range is invalid or inverted. Add
-`--json` to print the same filtered rows as structured JSON with stable
-schedule fields and validation metadata for scripts and agent workflows.
+inclusive, and fail before output when the range is invalid or inverted. The
+default table includes the selected artifact ID, or `none` when the schedule is
+not tied to a rendered artifact. Add `--json` to print the same filtered rows
+as structured JSON with stable schedule fields and validation metadata for
+scripts and agent workflows.
 
 Supported planned platforms:
 

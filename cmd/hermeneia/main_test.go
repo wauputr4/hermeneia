@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wauputr4/hermeneia/internal/storage"
 	"github.com/wauputr4/hermeneia/internal/workflow"
 )
 
@@ -367,6 +368,7 @@ func TestCLIContentRunWorkflow(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(runsRoot, "run-cli", "output", "carousel", "slide-01.png")); err != nil {
 		t.Fatal(err)
 	}
+	artifactID := firstCLITestArtifactID(t, ctx, dbPath, "run-cli")
 
 	stdout.Reset()
 	if err := cmd.run(ctx, []string{"schedule", "run-cli", "--platform", "instagram", "--at", "2026-05-10T02:00:00Z"}); err != nil {
@@ -378,7 +380,7 @@ func TestCLIContentRunWorkflow(t *testing.T) {
 	instagramScheduleID := strings.Fields(stdout.String())[3]
 
 	stdout.Reset()
-	if err := cmd.run(ctx, []string{"schedule", "--run=run-cli", "--platform=linkedin", "--at=2026-05-10T03:00:00Z"}); err != nil {
+	if err := cmd.run(ctx, []string{"schedule", "--run=run-cli", "--platform=linkedin", "--artifact=" + artifactID, "--at=2026-05-10T03:00:00Z"}); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(stdout.String(), "scheduled linkedin post") {
@@ -389,8 +391,11 @@ func TestCLIContentRunWorkflow(t *testing.T) {
 	if err := cmd.run(ctx, []string{"schedules"}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(stdout.String(), "instagram") || !strings.Contains(stdout.String(), "linkedin") || !strings.Contains(stdout.String(), "scheduled") {
+	if !strings.Contains(stdout.String(), "ARTIFACT ID") || !strings.Contains(stdout.String(), "instagram") || !strings.Contains(stdout.String(), "linkedin") || !strings.Contains(stdout.String(), "scheduled") {
 		t.Fatalf("unexpected schedules output:\n%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), artifactID) || !strings.Contains(stdout.String(), "none") {
+		t.Fatalf("schedules output missing artifact id or no-artifact fallback:\n%s", stdout.String())
 	}
 
 	stdout.Reset()
@@ -560,4 +565,21 @@ func TestScheduleValidationObjectEmptyFallback(t *testing.T) {
 			t.Fatalf("expected empty validation fallback for %q, got %#v", value, validation)
 		}
 	}
+}
+
+func firstCLITestArtifactID(t *testing.T, ctx context.Context, dbPath, runID string) string {
+	t.Helper()
+	db, err := storage.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	artifacts, err := storage.NewRepository(db).ListArtifactsByRun(ctx, runID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(artifacts) == 0 {
+		t.Fatal("expected rendered artifacts")
+	}
+	return artifacts[0].ID
 }

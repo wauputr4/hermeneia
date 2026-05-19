@@ -165,7 +165,7 @@ Current CLI surface:
 - `hermeneia render` writes `content.json`, generates output assets, and stores artifact references.
 - `hermeneia audit` checks a run's artifact rows against files, checksums, safe paths, and untracked output files.
 - `hermeneia schedule` records a future publishing slot with platform validation and no stored platform credentials.
-- `hermeneia schedules` lists scheduled publishing records and their statuses, with optional `--status`, `--platform`, `--from`, and `--to` filters plus `--json` for automation-safe structured output including validation metadata.
+- `hermeneia schedules` lists scheduled publishing records, artifact IDs, and statuses, with optional `--status`, `--platform`, `--from`, and `--to` filters plus `--json` for automation-safe structured output including validation metadata.
 
 Default MVP templates:
 
