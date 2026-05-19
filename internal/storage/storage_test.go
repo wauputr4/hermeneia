@@ -190,6 +190,13 @@ func TestRepositoryListScheduledPostsFiltered(t *testing.T) {
 	if len(combined) != 1 || combined[0].ID != "schedule-1" {
 		t.Fatalf("unexpected combined-filter schedules: %#v", combined)
 	}
+	runScoped, err := repo.ListScheduledPostsFiltered(ctx, ScheduledPostFilters{RunID: "run-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runScoped) != 2 || runScoped[0].ID != "schedule-1" || runScoped[1].ID != "schedule-3" {
+		t.Fatalf("unexpected run-filtered schedules: %#v", runScoped)
+	}
 	from := mustTime(t, "2026-05-10T03:00:00Z")
 	to := mustTime(t, "2026-05-10T04:00:00Z")
 	ranged, err := repo.ListScheduledPostsFiltered(ctx, ScheduledPostFilters{From: &from, To: &to})
@@ -205,6 +212,20 @@ func TestRepositoryListScheduledPostsFiltered(t *testing.T) {
 	}
 	if len(combinedRange) != 1 || combinedRange[0].ID != "schedule-2" {
 		t.Fatalf("unexpected combined range-filtered schedules: %#v", combinedRange)
+	}
+	runCombined, err := repo.ListScheduledPostsFiltered(ctx, ScheduledPostFilters{RunID: "run-1", Status: "cancelled", Platform: "instagram", From: &from, To: &to})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runCombined) != 1 || runCombined[0].ID != "schedule-3" {
+		t.Fatalf("unexpected run combined-filter schedules: %#v", runCombined)
+	}
+	missingRun, err := repo.ListScheduledPostsFiltered(ctx, ScheduledPostFilters{RunID: "missing-run"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(missingRun) != 0 {
+		t.Fatalf("expected missing run filter to return no schedules, got %#v", missingRun)
 	}
 }
 

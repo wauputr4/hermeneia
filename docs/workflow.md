@@ -202,6 +202,7 @@ outside the Hermeneia database.
 hermeneia schedule <run-id> --platform instagram --at 2026-05-10T02:00:00Z
 hermeneia cancel-schedule <schedule-id>
 hermeneia schedules
+hermeneia schedules --run <run-id>
 hermeneia schedules --status scheduled --platform instagram
 hermeneia schedules --from 2026-05-10T00:00:00Z --to 2026-05-11T00:00:00Z
 hermeneia schedules --status scheduled --platform instagram --json
@@ -210,9 +211,9 @@ hermeneia schedules --status scheduled --platform instagram --json
 Schedule cancellation is a local SQLite metadata update only. It marks a
 scheduled post `cancelled` when plans change, but it does not call Meta,
 YouTube, TikTok, LinkedIn, or any other external publishing platform.
-Use optional `--status`, `--platform`, `--from`, and `--to` filters with
-`hermeneia schedules` for focused local inspection. Omitting a flag leaves that
-dimension unfiltered. `--from` and `--to` must be RFC3339 timestamps, are
+Use optional `--run`, `--status`, `--platform`, `--from`, and `--to` filters
+with `hermeneia schedules` for focused local inspection. Omitting a flag leaves
+that dimension unfiltered. `--from` and `--to` must be RFC3339 timestamps, are
 inclusive, and fail before output when the range is invalid or inverted. The
 default table includes the selected artifact ID, or `none` when the schedule is
 not tied to a rendered artifact. Add `--json` to print the same filtered rows

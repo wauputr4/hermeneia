@@ -354,6 +354,7 @@ func (c command) schedules(ctx context.Context, args []string) error {
 	fs := c.flagSet("schedules")
 	var input workflow.ScheduleListInput
 	var jsonOutput bool
+	fs.StringVar(&input.RunID, "run", "", "filter by run id")
 	fs.StringVar(&input.Status, "status", "", "filter by schedule status")
 	fs.StringVar(&input.Platform, "platform", "", "filter by publishing platform")
 	fs.StringVar(&input.From, "from", "", "filter scheduled_at at or after this RFC3339 timestamp")
