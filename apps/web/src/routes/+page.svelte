@@ -41,6 +41,8 @@
 		scheduleAgendaRows,
 		scheduleArtifactOptions,
 		schedulePostPayload,
+		selectedRunScheduleEmptyMessage,
+		selectedRunScheduleRows,
 		templateContentTypeLabel,
 		templateForType,
 		templateLabel,
@@ -140,6 +142,8 @@
 	const agendaRows = $derived(scheduleAgendaRows(scheduledPosts, runs, agendaFilters));
 	const agendaGroups = $derived(scheduleAgendaGroups(scheduledPosts, runs, agendaFilters));
 	const agendaEmptyMessage = $derived(scheduleAgendaEmptyMessage(agendaFilters, runs));
+	const selectedScheduleRows = $derived(selectedRunScheduleRows(selectedDetails?.scheduled_posts));
+	const selectedScheduleEmptyMessage = $derived(selectedRunScheduleEmptyMessage(selectedDetails?.scheduled_posts));
 	let previousAgendaFilterKey = $state('all:all:scheduled:all::');
 
 	$effect(() => {
@@ -721,6 +725,32 @@
 							{/if}
 						</div>
 					<div>
+						<div class="schedule-history">
+							<div class="panel-head">
+								<div>
+									<h3>Schedule History</h3>
+									<p class="muted">Local records for this run.</p>
+								</div>
+								<span>{selectedScheduleRows.length}</span>
+							</div>
+							{#if selectedScheduleRows.length === 0}
+								<p class="muted">{selectedScheduleEmptyMessage}</p>
+							{:else}
+								<div class="schedule-history-list">
+									{#each selectedScheduleRows as schedule}
+										<article>
+											<div>
+												<strong>{schedule.platform}</strong>
+												<span class={`status ${schedule.status}`}>{schedule.status}</span>
+											</div>
+											<time datetime={schedule.scheduledAt}>{schedule.timeLabel}</time>
+											<small>{schedule.id}</small>
+											<small>Artifact: {schedule.artifactID}</small>
+										</article>
+									{/each}
+								</div>
+							{/if}
+						</div>
 						<div class="audit-panel">
 							<div class="panel-head">
 								<div>
@@ -1440,6 +1470,92 @@
 		margin-bottom: 18px;
 		border-bottom: 2px solid #1d241f;
 		padding-bottom: 16px;
+	}
+
+	.schedule-history {
+		display: grid;
+		gap: 10px;
+		margin-bottom: 18px;
+		border-bottom: 2px solid #1d241f;
+		padding-bottom: 16px;
+	}
+
+	.schedule-history .panel-head span {
+		min-width: 2.2rem;
+		border: 1px solid #1d241f;
+		background: #d9e078;
+		padding: 5px 8px;
+		font-family: 'Courier New', monospace;
+		font-size: 0.76rem;
+		text-align: center;
+	}
+
+	.schedule-history-list {
+		display: grid;
+		gap: 8px;
+	}
+
+	.schedule-history-list article {
+		display: grid;
+		gap: 6px;
+		border: 1px solid #1d241f;
+		background: #fffaf0;
+		padding: 10px;
+		font-family: 'Courier New', monospace;
+		font-size: 0.75rem;
+		word-break: break-word;
+	}
+
+	.schedule-history-list article > div {
+		display: flex;
+		gap: 8px;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.schedule-history-list strong {
+		font-family: Georgia, 'Times New Roman', serif;
+		font-size: 0.98rem;
+		text-transform: capitalize;
+	}
+
+	.schedule-history-list time {
+		width: fit-content;
+		border: 1px solid #1d241f;
+		background: #d9e078;
+		padding: 4px 6px;
+	}
+
+	.schedule-history-list small {
+		color: #657166;
+	}
+
+	.status {
+		border: 1px solid #1d241f;
+		background: #f8f0df;
+		padding: 3px 6px;
+		font-size: 0.68rem;
+		text-transform: uppercase;
+	}
+
+	.status.scheduled {
+		background: #d9e078;
+	}
+
+	.status.cancelled {
+		background: #ded6c8;
+	}
+
+	.status.failed {
+		background: #ffd7c8;
+	}
+
+	.status.publishing {
+		background: #f4e2cd;
+	}
+
+	.status.published {
+		background: #d7ead9;
 	}
 
 	.audit-status {

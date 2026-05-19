@@ -15,6 +15,7 @@ The MVP slice supports:
 - opening or downloading individual artifacts through the local API file endpoint,
 - running the read-only artifact integrity audit for the selected run,
 - creating local schedule records for rendered artifacts,
+- reviewing selected-run local schedule history,
 - viewing a read-only scheduled-post agenda across local runs,
 - creating a run with a workflow-aware and template-aware form,
 - reviewing selected workflow metadata and ordered steps before run creation,
@@ -82,6 +83,11 @@ and time. The UI converts the selected time to an RFC3339 timestamp for the API,
 then refreshes the selected run so the step timeline shows the new scheduled
 post. This is local metadata only: the MVP does not store platform credentials
 and does not call Meta, YouTube, TikTok, LinkedIn, or other publishing APIs.
+The selected run detail area shows the same run-local schedule records in a
+compact history list using `selectedDetails.scheduled_posts`, ordered by
+`scheduled_at` with schedule ID as a deterministic fallback. Rows show schedule
+ID, platform, status, artifact ID or `none`, and scheduled time without making
+another API request.
 
 The sidebar agenda reads:
 

@@ -27,6 +27,8 @@ import {
 	scheduleArtifactOptions,
 	schedulePostPayload,
 	scheduleValidationSummary,
+	selectedRunScheduleEmptyMessage,
+	selectedRunScheduleRows,
 	templateContentTypeLabel,
 	templateForType,
 	templateLabel,
@@ -410,6 +412,45 @@ describe('web view model helpers', () => {
 			]).map((row) => row.id),
 			['schedule-a', 'schedule-b']
 		);
+	});
+
+	it('builds selected-run schedule history rows with deterministic ordering and none artifacts', () => {
+		assert.deepEqual(
+			selectedRunScheduleRows([
+				{
+					id: 'schedule-b',
+					platform: 'linkedin',
+					status: 'cancelled',
+					artifact_id: '',
+					scheduled_at: '2026-05-18T10:00:00Z'
+				},
+				{
+					id: 'schedule-c',
+					platform: 'youtube',
+					status: 'published',
+					artifact_id: 'artifact-2',
+					scheduled_at: '2026-05-18T09:00:00Z'
+				},
+				{
+					id: 'schedule-a',
+					platform: 'instagram',
+					status: 'scheduled',
+					artifact_id: 'artifact-1',
+					scheduled_at: '2026-05-18T09:00:00Z'
+				}
+			]).map((row) => [row.id, row.platform, row.status, row.artifactID]),
+			[
+				['schedule-a', 'instagram', 'scheduled', 'artifact-1'],
+				['schedule-c', 'youtube', 'published', 'artifact-2'],
+				['schedule-b', 'linkedin', 'cancelled', 'none']
+			]
+		);
+	});
+
+	it('returns selected-run schedule empty copy only when no schedules exist', () => {
+		assert.equal(selectedRunScheduleEmptyMessage([]), 'No local schedules for this run yet.');
+		assert.equal(selectedRunScheduleEmptyMessage(null), 'No local schedules for this run yet.');
+		assert.equal(selectedRunScheduleEmptyMessage([{ id: 'schedule-1' }]), '');
 	});
 
 	it('returns no scheduled-post agenda groups for empty or filtered-out rows', () => {
