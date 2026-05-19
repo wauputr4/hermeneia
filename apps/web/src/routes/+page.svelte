@@ -70,6 +70,7 @@
 	let notice = $state('');
 	let cancellingScheduleID = $state('');
 	let agendaRunFilter = $state('all');
+	let agendaArtifactFilter = $state('all');
 	let agendaStatusFilter = $state('scheduled');
 	let agendaPlatformFilter = $state('all');
 	let agendaFromFilter = $state('');
@@ -123,8 +124,10 @@
 	const selectedRunTimeline = $derived(workflowTimeline(selectedDetails));
 	const artifactAuditRows = $derived(auditIssueRows(artifactAudit));
 	const scheduleOptions = $derived(selectedDetails ? scheduleArtifactOptions(selectedDetails.artifacts) : []);
+	const agendaArtifactOptions = $derived(selectedDetails ? scheduleArtifactOptions(selectedDetails.artifacts) : []);
 	const agendaFilters = $derived({
 		runID: agendaRunFilter,
+		artifactID: agendaArtifactFilter,
 		status: agendaStatusFilter,
 		platform: agendaPlatformFilter,
 		from: agendaFromFilter,
@@ -133,10 +136,10 @@
 	const agendaRows = $derived(scheduleAgendaRows(scheduledPosts, runs, agendaFilters));
 	const agendaGroups = $derived(scheduleAgendaGroups(scheduledPosts, runs, agendaFilters));
 	const agendaEmptyMessage = $derived(scheduleAgendaEmptyMessage(agendaFilters, runs));
-	let previousAgendaFilterKey = $state('all:scheduled:all::');
+	let previousAgendaFilterKey = $state('all:all:scheduled:all::');
 
 	$effect(() => {
-		const key = `${agendaRunFilter}:${agendaStatusFilter}:${agendaPlatformFilter}:${agendaFromFilter}:${agendaToFilter}`;
+		const key = `${agendaRunFilter}:${agendaArtifactFilter}:${agendaStatusFilter}:${agendaPlatformFilter}:${agendaFromFilter}:${agendaToFilter}`;
 		if (key === previousAgendaFilterKey) return;
 		previousAgendaFilterKey = key;
 		loadScheduleAgenda();
@@ -190,15 +193,16 @@
 			await loadScheduleAgenda();
 			if (runs.length > 0) {
 				await selectRun(runs[0].id);
-				}
-			} catch (err) {
-				error = err instanceof Error ? err.message : 'Unable to load runs';
-			} finally {
-				if (agendaRunFilter !== 'all' && !runs.some((run) => run.id === agendaRunFilter)) {
-					agendaRunFilter = 'all';
-				}
-				loading = false;
 			}
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Unable to load runs';
+		} finally {
+			if (agendaRunFilter !== 'all' && !runs.some((run) => run.id === agendaRunFilter)) {
+				agendaRunFilter = 'all';
+			}
+			syncAgendaArtifactFilter();
+			loading = false;
+		}
 	}
 
 	async function loadScheduleAgenda() {
@@ -232,8 +236,10 @@
 				artifactKindFilter = 'all';
 			}
 			syncScheduleArtifact();
+			syncAgendaArtifactFilter();
 		} catch (err) {
 			selectedDetails = null;
+			syncAgendaArtifactFilter();
 			error = err instanceof Error ? err.message : 'Unable to load run details';
 		}
 	}
@@ -379,6 +385,13 @@
 		}
 	}
 
+	function syncAgendaArtifactFilter() {
+		const options = selectedDetails ? scheduleArtifactOptions(selectedDetails.artifacts) : [];
+		if (agendaArtifactFilter !== 'all' && !options.some((option) => option.id === agendaArtifactFilter)) {
+			agendaArtifactFilter = 'all';
+		}
+	}
+
 	function clearAgendaRange() {
 		agendaFromFilter = '';
 		agendaToFilter = '';
@@ -449,6 +462,15 @@
 							<option value="all">All runs</option>
 							{#each runs as run}
 								<option value={run.id}>{run.topic}</option>
+							{/each}
+						</select>
+					</label>
+					<label>
+						Artifact
+						<select bind:value={agendaArtifactFilter} disabled={agendaArtifactOptions.length === 0}>
+							<option value="all">All artifacts</option>
+							{#each agendaArtifactOptions as option}
+								<option value={option.id}>{option.label}</option>
 							{/each}
 						</select>
 					</label>

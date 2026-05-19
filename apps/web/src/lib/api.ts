@@ -145,6 +145,8 @@ export type SchedulePostInput = {
 };
 
 export type ScheduledPostFilters = {
+	run_id?: string;
+	artifact_id?: string;
 	status?: string;
 	platform?: string;
 	from?: string;

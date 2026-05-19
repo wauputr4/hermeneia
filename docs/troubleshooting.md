@@ -210,6 +210,11 @@ Important guardrails:
   selecting `all` for run, status, or platform intentionally omits that query
   parameter. If agenda rows look incomplete, confirm the visible filters before
   checking the database.
+- The Web UI agenda can also filter by one selected rendered artifact through
+  `artifact_id`. Artifact choices come from the selected run details and exclude
+  research artifacts. If the selected run changes and the previous artifact is
+  not available there, the UI resets the agenda artifact filter to all artifacts
+  before refreshing.
 - The Web UI agenda range controls convert browser-local `datetime-local`
   values to RFC3339 `from` and `to` API filters before refreshing. Invalid
   values or a start time later than the end time are rejected in the browser, so
